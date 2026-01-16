@@ -34,7 +34,6 @@ function createStubLogger(name: string, parentFields: Record<string, unknown> = 
 // Load lib-log once at module init (top-level await)
 let libLog: { createLogger: (name: string) => Logger } | undefined;
 try {
-  // @ts-ignore - optional peer dependency
   libLog = await import('@mdr/lib-log');
 } catch {
   const msg = `[lib-utils] lib-log not available, using stub. Consider running: cd ${process.cwd()} && bun add file:../lib-log`;
