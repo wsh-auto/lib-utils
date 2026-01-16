@@ -34,10 +34,10 @@ function createStubLogger(name: string, parentFields: Record<string, unknown> = 
 // Load lib-log once at module init (top-level await)
 let libLog: { createLogger: (name: string) => Logger } | undefined;
 try {
-  // @ts-ignore - lib-log is an optional peer dependency, may not be installed
+  // @ts-ignore - optional peer dependency
   libLog = await import('@mdr/lib-log');
 } catch {
-  const msg = `[lib-utils] lib-log not available, using stub. Consider running: cd ${process.cwd()} && bun add @mdr/lib-log`;
+  const msg = `[lib-utils] lib-log not available, using stub. Consider running: cd ${process.cwd()} && bun add file:../lib-log`;
   process.env.CI ? console.log(msg) : console.error(msg);
 }
 

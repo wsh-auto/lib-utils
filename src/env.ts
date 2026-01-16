@@ -9,10 +9,10 @@ async function loadLib1p() {
   if (loadAttempted) return lib1p;
   loadAttempted = true;
   try {
-    // @ts-expect-error - lib-1password is an optional peer dependency
+    // @ts-ignore - optional peer dependency
     lib1p = await import('@mdr/lib-1password');
   } catch {
-    const msg = `[lib-utils] lib-1password not available, skipping env injection. Consider running: cd ${process.cwd()} && bun update @mdr/lib-1password`;
+    const msg = `[lib-utils] lib-1password not available, skipping env injection. Consider running: cd ${process.cwd()} && bun add file:../lib-1password`;
     process.env.CI ? console.log(msg) : console.error(msg);
   }
   return lib1p;

@@ -19,27 +19,40 @@ Utilities that enhance development but gracefully degrade in CI environments.
 bun add github:wsh-auto/lib-utils
 ```
 
-No CI configuration needed - utilities auto-detect environment and degrade gracefully.
+**CRITICAL** - Consumer `package.json`:
+```jsonc
+"dependencies": {
+  "@mdr/lib-utils": "github:wsh-auto/lib-utils",  // ALWAYS github
+  "@mdr/lib-log": "file:../lib-log",              // ALWAYS local (optional)
+  "@mdr/lib-1password": "file:../lib-1password"   // ALWAYS local (optional)
+}
+```
+
+- **lib-utils ALWAYS via `github:`** - stable wrapper, rarely changes
+- **lib-log/lib-1password ALWAYS via `file:`** - active development, `file:` = symlink (instant updates, no reinstall)
+- **Graceful degradation** (lib-log/lib-1password are optional):
+  - Without lib-log: `createLogger` returns console stub
+  - Without lib-1password: `initEnv` is no-op
+  - In CI: typically omit both (use CI secrets + console logging)
 
 ## Logger
 
 ```typescript
-import { createLogger } from '@mdr/lib-utils';
+import { createLogger, type Logger } from '@mdr/lib-utils';
 
-const log = createLogger('my-project');
+const log: Logger = createLogger('my-project');
 
 log.info('Starting');
 log.error('Failed', { code: 500 });
 await log.flush();
+
+// Child loggers inherit context
+const reqLog = log.child({ requestId: 'abc123' });
+reqLog.info('Processing');  // includes requestId in every message
 ```
 
-- If `@mdr/lib-log` is installed: full Axiom logging
-- If not (CI): console-based stub (info/warn/error only, debug silent)
-
-To get full logging in dev, also install lib-log:
-```bash
-bun add file:../lib-log  # Local for instant updates
-```
+- If `@mdr/lib-log` installed: full Axiom logging
+- If not: console-based stub (info/warn/error only, debug silent)
 
 ## Environment Injection
 
@@ -51,11 +64,8 @@ await initEnv(import.meta.dirname);
 ```
 
 Behavior:
-- **CI (`process.env.CI` set):** Skips entirely
-- **`.env` exists:** Skips (already initialized)
-- **No `.env.template`:** Skips
-- **No `op` CLI:** Skips
-- **Otherwise:** Runs `op inject -i .env.template -o .env`
+- If `@mdr/lib-1password` installed: delegates to its `initEnv()` (handles CI detection, `.env` checks, `op` CLI)
+- If not installed: logs warning and returns (common in CI where 1Password unavailable)
 
 ### Options
 

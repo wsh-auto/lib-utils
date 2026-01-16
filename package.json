@@ -24,6 +24,8 @@
     }
   },
   "devDependencies": {
+    "@mdr/lib-1password": "file:../lib-1password",
+    "@mdr/lib-log": "file:../lib-log",
     "@types/node": "20.13.0",
     "typescript": "5.4.5",
     "vitest": "^2.1.0"
