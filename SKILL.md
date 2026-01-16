@@ -47,7 +47,7 @@ bun add file:../lib-log  # Local for instant updates
 import { initEnv } from '@mdr/lib-utils';
 
 // At startup, before reading env vars
-initEnv(import.meta.dirname);
+await initEnv(import.meta.dirname);
 ```
 
 Behavior:
@@ -60,12 +60,11 @@ Behavior:
 ### Options
 
 ```typescript
-initEnv(projectRoot, {
-  // Skip if these env vars are already set
-  skipIfEnvVars: ['MY_API_KEY', 'MY_SECRET'],
-  // Custom error logger
-  log: { error: (msg) => myLogger.error(msg) },
-});
+// Skip if these env vars are already set
+await initEnv(projectRoot, ['MY_API_KEY', 'MY_SECRET']);
+
+// With custom error logger
+await initEnv(projectRoot, undefined, { error: (msg) => myLogger.error(msg) });
 ```
 
 ### Project Setup
@@ -89,7 +88,7 @@ export MY_API_KEY=op://wsh/skills_my-project/API_KEY
 import { createLogger, initEnv } from '@mdr/lib-utils';
 
 // Initialize env first (no-op in CI)
-initEnv(import.meta.dirname);
+await initEnv(import.meta.dirname);
 
 // Create logger (stub in CI if lib-log not installed)
 const log = createLogger('my-project');

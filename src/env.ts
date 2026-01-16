@@ -3,14 +3,22 @@
  */
 
 let lib1p: { initEnv: (root: string, skip?: string[], log?: unknown) => void } | undefined;
-try {
-  // @ts-expect-error - lib-1password is an optional peer dependency
-  lib1p = await import('@mdr/lib-1password');
-} catch {
-  const msg = '[lib-utils] lib-1password not available, skipping env injection';
-  process.env.CI ? console.log(msg) : console.error(msg);
+let loadAttempted = false;
+
+async function loadLib1p() {
+  if (loadAttempted) return lib1p;
+  loadAttempted = true;
+  try {
+    // @ts-expect-error - lib-1password is an optional peer dependency
+    lib1p = await import('@mdr/lib-1password');
+  } catch {
+    const msg = `[lib-utils] lib-1password not available, skipping env injection. Consider running: cd ${process.cwd()} && bun update @mdr/lib-1password`;
+    process.env.CI ? console.log(msg) : console.error(msg);
+  }
+  return lib1p;
 }
 
-export function initEnv(projectRoot: string, skipIfEnvVars?: string[], log?: unknown): void {
-  lib1p?.initEnv(projectRoot, skipIfEnvVars, log);
+export async function initEnv(projectRoot: string, skipIfEnvVars?: string[], log?: unknown): Promise<void> {
+  const mod = await loadLib1p();
+  mod?.initEnv(projectRoot, skipIfEnvVars, log);
 }

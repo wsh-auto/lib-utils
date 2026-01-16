@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# Update all projects that depend on @mdr/lib-utils to latest version
+
+set -euo pipefail
+
+CYAN=$'\x1b[1m\x1b[36m'
+YELLOW=$'\x1b[33m'
+GREEN=$'\x1b[32m'
+RED=$'\x1b[31m'
+DIM=$'\x1b[2m'
+BOLD=$'\x1b[1m'
+NC=$'\x1b[0m'
+
+show_help() {
+  cat <<EOF
+
+${CYAN}NAME${NC}
+    ${BOLD}_LIB-UTILS_update-dependents${NC} - Update all lib-utils dependents to latest
+
+${CYAN}USAGE${NC}
+    ${BOLD}_LIB-UTILS_update-dependents${NC} [${YELLOW}OPTIONS${NC}]
+
+${CYAN}DESCRIPTION${NC}
+    Scans ~/mnt for all package.json files containing @mdr/lib-utils,
+    removes their bun.lockb to clear pinned commits, and runs bun install
+    to fetch the latest version from GitHub.
+
+${CYAN}OPTIONS${NC}
+    ${YELLOW}--dry-run${NC}         List projects without updating
+    ${YELLOW}--help${NC}, ${YELLOW}-h${NC}       Show this help message
+
+${CYAN}EXAMPLES${NC}
+    ${DIM}# Update all dependents${NC}
+    _LIB-UTILS_update-dependents
+
+    ${DIM}# Preview what would be updated${NC}
+    _LIB-UTILS_update-dependents --dry-run
+
+${DIM}AGENTS: MUST load \$mdr:lib-utils before editing or for context${NC}
+EOF
+}
+
+DRY_RUN=false
+
+for arg in "$@"; do
+  case $arg in
+    --help|-h) show_help; exit 0 ;;
+    --dry-run) DRY_RUN=true ;;
+    *) echo "Unknown option: $arg"; show_help; exit 1 ;;
+  esac
+done
+
+echo "${CYAN}Scanning ~/mnt for @mdr/lib-utils dependents...${NC}"
+
+# Find all package.json with lib-utils, excluding node_modules
+mapfile -t DEPENDENTS < <(
+  find ~/mnt -name package.json -not -path '*/node_modules/*' 2>/dev/null | \
+  xargs grep -l '@mdr/lib-utils' 2>/dev/null | \
+  xargs -I{} dirname {} | \
+  sort
+)
+
+if [[ ${#DEPENDENTS[@]} -eq 0 ]]; then
+  echo "${YELLOW}No dependents found.${NC}"
+  exit 0
+fi
+
+echo "Found ${GREEN}${#DEPENDENTS[@]}${NC} projects:"
+echo
+
+if $DRY_RUN; then
+  for dir in "${DEPENDENTS[@]}"; do
+    echo "  ${DIM}${dir/#$HOME/\~}${NC}"
+  done
+  echo
+  echo "${YELLOW}Dry run - no changes made.${NC}"
+  exit 0
+fi
+
+SUCCESS=0
+FAIL=0
+
+for dir in "${DEPENDENTS[@]}"; do
+  short_path="${dir/#$HOME/\~}"
+  printf "  Updating %s..." "$short_path"
+
+  cd "$dir"
+  rm -f bun.lockb
+
+  if output=$(bun install 2>&1); then
+    version=$(echo "$output" | grep -o '@mdr/lib-utils@github:wsh-auto/lib-utils#[a-f0-9]*' | head -1 | sed 's/.*#//' | cut -c1-7)
+    echo " ${GREEN}✓${NC} ${DIM}${version:-latest}${NC}"
+    ((SUCCESS++))
+  else
+    echo " ${RED}✗${NC}"
+    echo "    ${RED}${output}${NC}" | head -2
+    ((FAIL++))
+  fi
+done
+
+echo
+echo "${CYAN}Done:${NC} ${GREEN}${SUCCESS} updated${NC}$( [[ $FAIL -gt 0 ]] && echo ", ${RED}${FAIL} failed${NC}" )"
+exit $([[ $FAIL -gt 0 ]] && echo 1 || echo 0)

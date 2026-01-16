@@ -1,2 +1,2 @@
-export { createLogger } from './logger.js';
+export { createLogger, type Logger } from './logger.js';
 export { initEnv } from './env.js';
