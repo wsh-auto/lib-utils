@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Update all projects that depend on @mdr/lib-utils to latest version
 
-set -euo pipefail
+set -uo pipefail  # Removed -e to not exit on errors
 
 CYAN=$'\x1b[1m\x1b[36m'
 YELLOW=$'\x1b[33m'
@@ -81,52 +81,58 @@ if $DRY_RUN; then
   exit 0
 fi
 
-# Counters file for atomic updates
-COUNTER_FILE=$(mktemp)
-echo "0 0" > "$COUNTER_FILE"
-trap 'rm -f "$COUNTER_FILE"' EXIT
+# Simple failure counter using a file
+FAIL_FILE=$(mktemp)
+echo 0 > "$FAIL_FILE"
+trap 'rm -f "$FAIL_FILE"' EXIT
 
 update_project() {
   local dir=$1
   local short_path="${dir/#$HOME/\~}"
 
-  cd "$dir"
+  cd "$dir" || { printf "  \x1b[31m✗\x1b[0m %s \x1b[2mcd failed\x1b[0m\n" "$short_path"; return 1; }
   rm -f bun.lockb
 
-  if output=$(bun install 2>&1); then
+  local output exit_code
+  output=$(bun install 2>&1) && exit_code=0 || exit_code=$?
+
+  if [[ $exit_code -eq 0 ]]; then
+    local version
     version=$(echo "$output" | grep -o '@mdr/lib-utils@github:wsh-auto/lib-utils#[a-f0-9]*' | head -1 | sed 's/.*#//' | cut -c1-7)
-    printf "  \x1b[32m✓\x1b[0m %s \x1b[2m%s\x1b[0m\n" "$short_path" "${version:-latest}"
-    flock "$COUNTER_FILE" bash -c 'read s f < "$1"; echo "$((s+1)) $f" > "$1"' _ "$COUNTER_FILE"
+    printf "  \x1b[32m✓\x1b[0m %s \x1b[2m%s\x1b[0m\n" "$short_path" "${version:-ok}"
+    return 0
   else
-    printf "  \x1b[31m✗\x1b[0m %s\n    \x1b[31m%s\x1b[0m\n" "$short_path" "$(echo "$output" | head -1)"
-    flock "$COUNTER_FILE" bash -c 'read s f < "$1"; echo "$s $((f+1))" > "$1"' _ "$COUNTER_FILE"
+    local err_msg
+    err_msg=$(echo "$output" | grep -i -E 'error|fail' | head -1 | cut -c1-50)
+    printf "  \x1b[31m✗\x1b[0m %s \x1b[2m%s\x1b[0m\n" "$short_path" "${err_msg:-failed}"
+    return 1
   fi
 }
 
 export -f update_project
-export HOME COUNTER_FILE
+export HOME
 
+FAIL=0
 if $PARALLEL; then
-  # Run in parallel with job control
-  job_count=0
+  pids=()
   for dir in "${DEPENDENTS[@]}"; do
     update_project "$dir" &
-    ((job_count++)) || true
-    if [[ $job_count -ge $MAX_JOBS ]]; then
-      wait -n 2>/dev/null || true
-      ((job_count--)) || true
+    pids+=($!)
+    if [[ ${#pids[@]} -ge $MAX_JOBS ]]; then
+      wait "${pids[0]}" || ((FAIL++)) || true
+      pids=("${pids[@]:1}")
     fi
   done
-  wait
+  for pid in "${pids[@]}"; do
+    wait "$pid" || ((FAIL++)) || true
+  done
 else
-  # Run sequentially
   for dir in "${DEPENDENTS[@]}"; do
-    update_project "$dir"
+    update_project "$dir" || ((FAIL++)) || true
   done
 fi
 
-# Read final counts
-read SUCCESS FAIL < "$COUNTER_FILE"
+SUCCESS=$((${#DEPENDENTS[@]} - FAIL))
 
 echo
 echo "${CYAN}Done:${NC} ${GREEN}${SUCCESS} updated${NC}$( [[ $FAIL -gt 0 ]] && echo ", ${RED}${FAIL} failed${NC}" )"

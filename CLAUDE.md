@@ -4,16 +4,18 @@ requiredSkills:
   - mdr:lib-1password
   - mdr:lib-log
 requiredFiles:
+  - scripts/_LIB-UTILS_update-dependents
   - src/env.ts
   - src/index.ts
   - src/logger.ts
 ---
 
-# lib-utils (7.7k)
-## Documentation (900)
-- @SKILL.md (900)
+# lib-utils (8.4k)
+## Documentation (800)
+- @SKILL.md (800)
 
-## Code (800)
+## Code (1.6k)
+- @scripts/_LIB-UTILS_update-dependents (900)
 - @src/env.ts (200)
 - @src/index.ts (100)
 - @src/logger.ts (500)
