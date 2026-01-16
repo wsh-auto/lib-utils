@@ -1,0 +1,31 @@
+{
+  "name": "@mdr/lib-utils",
+  "version": "1.0.0",
+  "type": "module",
+  "packageManager": "bun@1.1.45",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "bun run typecheck && bun run test"
+  },
+  "peerDependencies": {
+    "@mdr/lib-log": "*",
+    "@mdr/lib-1password": "*"
+  },
+  "peerDependenciesMeta": {
+    "@mdr/lib-log": {
+      "optional": true
+    },
+    "@mdr/lib-1password": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "20.13.0",
+    "typescript": "5.4.5",
+    "vitest": "^2.1.0"
+  }
+}
