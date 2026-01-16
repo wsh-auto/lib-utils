@@ -38,9 +38,9 @@ bun add github:wsh-auto/lib-utils
 ## Logger
 
 ```typescript
-import { createLogger, type Logger } from '@mdr/lib-utils';
+import { createLogger } from '@mdr/lib-utils';
 
-const log: Logger = createLogger('my-project');
+const log = createLogger('my-project');
 
 log.info('Starting');
 log.error('Failed', { code: 500 });

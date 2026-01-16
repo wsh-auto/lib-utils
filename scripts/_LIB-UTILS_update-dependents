@@ -90,11 +90,11 @@ for dir in "${DEPENDENTS[@]}"; do
   if output=$(bun install 2>&1); then
     version=$(echo "$output" | grep -o '@mdr/lib-utils@github:wsh-auto/lib-utils#[a-f0-9]*' | head -1 | sed 's/.*#//' | cut -c1-7)
     echo " ${GREEN}✓${NC} ${DIM}${version:-latest}${NC}"
-    ((SUCCESS++))
+    ((SUCCESS++)) || true
   else
     echo " ${RED}✗${NC}"
     echo "    ${RED}${output}${NC}" | head -2
-    ((FAIL++))
+    ((FAIL++)) || true
   fi
 done
 
