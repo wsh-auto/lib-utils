@@ -23,14 +23,15 @@ ${CYAN}USAGE${NC}
 ${CYAN}DESCRIPTION${NC}
     Scans ~/mnt for all package.json files containing @mdr/lib-utils,
     removes their bun.lockb to clear pinned commits, and runs bun install
-    to fetch the latest version from GitHub.
+    to fetch the latest version from GitHub. Runs in parallel (8 jobs).
 
 ${CYAN}OPTIONS${NC}
     ${YELLOW}--dry-run${NC}         List projects without updating
+    ${YELLOW}--serial${NC}          Run sequentially instead of parallel
     ${YELLOW}--help${NC}, ${YELLOW}-h${NC}       Show this help message
 
 ${CYAN}EXAMPLES${NC}
-    ${DIM}# Update all dependents${NC}
+    ${DIM}# Update all dependents (parallel)${NC}
     _LIB-UTILS_update-dependents
 
     ${DIM}# Preview what would be updated${NC}
@@ -41,11 +42,14 @@ EOF
 }
 
 DRY_RUN=false
+PARALLEL=true
+MAX_JOBS=8
 
 for arg in "$@"; do
   case $arg in
     --help|-h) show_help; exit 0 ;;
     --dry-run) DRY_RUN=true ;;
+    --serial) PARALLEL=false ;;
     *) echo "Unknown option: $arg"; show_help; exit 1 ;;
   esac
 done
@@ -77,26 +81,52 @@ if $DRY_RUN; then
   exit 0
 fi
 
-SUCCESS=0
-FAIL=0
+# Counters file for atomic updates
+COUNTER_FILE=$(mktemp)
+echo "0 0" > "$COUNTER_FILE"
+trap 'rm -f "$COUNTER_FILE"' EXIT
 
-for dir in "${DEPENDENTS[@]}"; do
-  short_path="${dir/#$HOME/\~}"
-  printf "  Updating %s..." "$short_path"
+update_project() {
+  local dir=$1
+  local short_path="${dir/#$HOME/\~}"
 
   cd "$dir"
   rm -f bun.lockb
 
   if output=$(bun install 2>&1); then
     version=$(echo "$output" | grep -o '@mdr/lib-utils@github:wsh-auto/lib-utils#[a-f0-9]*' | head -1 | sed 's/.*#//' | cut -c1-7)
-    echo " ${GREEN}✓${NC} ${DIM}${version:-latest}${NC}"
-    ((SUCCESS++)) || true
+    printf "  \x1b[32m✓\x1b[0m %s \x1b[2m%s\x1b[0m\n" "$short_path" "${version:-latest}"
+    flock "$COUNTER_FILE" bash -c 'read s f < "$1"; echo "$((s+1)) $f" > "$1"' _ "$COUNTER_FILE"
   else
-    echo " ${RED}✗${NC}"
-    echo "    ${RED}${output}${NC}" | head -2
-    ((FAIL++)) || true
+    printf "  \x1b[31m✗\x1b[0m %s\n    \x1b[31m%s\x1b[0m\n" "$short_path" "$(echo "$output" | head -1)"
+    flock "$COUNTER_FILE" bash -c 'read s f < "$1"; echo "$s $((f+1))" > "$1"' _ "$COUNTER_FILE"
   fi
-done
+}
+
+export -f update_project
+export HOME COUNTER_FILE
+
+if $PARALLEL; then
+  # Run in parallel with job control
+  job_count=0
+  for dir in "${DEPENDENTS[@]}"; do
+    update_project "$dir" &
+    ((job_count++)) || true
+    if [[ $job_count -ge $MAX_JOBS ]]; then
+      wait -n 2>/dev/null || true
+      ((job_count--)) || true
+    fi
+  done
+  wait
+else
+  # Run sequentially
+  for dir in "${DEPENDENTS[@]}"; do
+    update_project "$dir"
+  done
+fi
+
+# Read final counts
+read SUCCESS FAIL < "$COUNTER_FILE"
 
 echo
 echo "${CYAN}Done:${NC} ${GREEN}${SUCCESS} updated${NC}$( [[ $FAIL -gt 0 ]] && echo ", ${RED}${FAIL} failed${NC}" )"
