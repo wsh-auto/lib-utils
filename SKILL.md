@@ -8,10 +8,10 @@ description: >-
 
 Utilities that enhance development but gracefully degrade in CI environments.
 
-| Optional Dep | Export | With Dep | Without Dep (CI) | Without Dep (not CI) |
-|--------------|--------|----------|------------------|----------------------|
-| lib-log | `createLogger` | Axiom logging | Console stub | **exit(1)** |
-| lib-1password | `initEnv` | 1Password injection | No-op stub | **exit(1)** |
+| Import Path | Optional Dep | With Dep | Without Dep (CI) | Without Dep (not CI) |
+|-------------|--------------|----------|------------------|----------------------|
+| `@mdr/lib-utils/logger` | lib-log | Axiom logging | Console stub | **exit(1)** |
+| `@mdr/lib-utils/env` | lib-1password | 1Password injection | No-op stub | **exit(1)** |
 
 ## Installation
 
@@ -19,21 +19,21 @@ Utilities that enhance development but gracefully degrade in CI environments.
 bun add github:wsh-auto/lib-utils
 ```
 
-**Consumer `package.json`:**
+**Consumer `package.json` (only include optionalDeps you use):**
 ```json
 "dependencies": {
   "@mdr/lib-utils": "github:wsh-auto/lib-utils"
 },
 "optionalDependencies": {
-  "@mdr/lib-log": "file:../lib-log",
-  "@mdr/lib-1password": "file:../lib-1password"
+  "@mdr/lib-log": "file:../lib-log"
 }
 ```
 
-- **lib-utils**: always `github:` in dependencies - stable wrapper, rarely changes
-- **lib-log/lib-1password**: always `file:` in **optionalDependencies** - installs locally (NFS), stubs in CI
+- **Separate exports**: Import from `/logger` or `/env` - each loads only its optional dep
+- **lib-utils**: always `github:` in dependencies
+- **lib-log/lib-1password**: always `file:` in **optionalDependencies** - only include what you use
 - **CI**: graceful degradation (console stub / no-op)
-- **Not CI**: fatal exit if optional deps missing (enforces proper setup)
+- **Not CI**: fatal exit if optional dep missing for the export you import
 
 **For 1Password env injection**, create `.env.template` (committed) with `op://` refs:
 ```bash
@@ -44,7 +44,7 @@ Add `.env` to `.gitignore` - it's generated with real values at runtime.
 ## lib-log / logger.ts - createLogger(project-name)
 
 ```typescript
-import { createLogger } from '@mdr/lib-utils';
+import { createLogger } from '@mdr/lib-utils/logger';
 
 const log = createLogger('my-project');
 
@@ -64,7 +64,7 @@ reqLog.info('Processing');  // includes requestId in every message
 ## lib-1password / env.ts - initEnv(projectRoot, skipIfEnvVars?, log?)
 
 ```typescript
-import { initEnv } from '@mdr/lib-utils';
+import { initEnv } from '@mdr/lib-utils/env';
 
 const result = initEnv(import.meta.dirname);              // basic - returns { parsed: {...} }
 initEnv(projectRoot, ['MY_API_KEY']);                     // skip if env vars already set
