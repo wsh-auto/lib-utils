@@ -66,13 +66,14 @@ reqLog.info('Processing');  // includes requestId in every message
 ```typescript
 import { initEnv } from '@mdr/lib-utils';
 
-await initEnv(import.meta.dirname);                          // basic
-await initEnv(projectRoot, ['MY_API_KEY']);                  // skip if env vars set
-await initEnv(projectRoot, undefined, { error: myLogger });  // custom logger
+const result = initEnv(import.meta.dirname);              // basic - returns { parsed: {...} }
+initEnv(projectRoot, ['MY_API_KEY']);                     // skip if env vars already set
+initEnv(projectRoot, [], customLogger);                   // custom logger (must have info/error)
 ```
 
+- Returns `DotenvConfigOutput` with `{ parsed: Record<string, string> }`
 - If `@mdr/lib-1password` installed: delegates to lib1p.initEnv() (1Password injection)
-- If not + CI: no-op stub
+- If not + CI: returns `{ parsed: {} }` (empty stub)
 - If not + not CI: exit(1) with instructions to add to optionalDependencies
 
 ## Scripts
