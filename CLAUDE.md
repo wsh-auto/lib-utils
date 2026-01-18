@@ -6,19 +6,17 @@ requiredSkills:
 requiredFiles:
   - scripts/_LIB-UTILS_update-dependents
   - src/env.ts
-  - src/index.ts
   - src/logger.ts
 ---
 
-# lib-utils (8.3k)
-## Documentation (600)
-- @SKILL.md (600)
+# lib-utils (9.1k)
+## Documentation (800)
+- @SKILL.md (800)
 
-## Code (1.7k)
+## Code (2.2k)
 - @scripts/_LIB-UTILS_update-dependents (900)
-- @src/env.ts (200)
-- @src/index.ts (100)
-- @src/logger.ts (500)
+- @src/env.ts (600)
+- @src/logger.ts (700)
 
 ## requiredSkills (6k)
 - [@../edit-skill/SKILL.md (3k)](https://hackmd.io/TmfBsoskTnGqEf90YZch5Q)

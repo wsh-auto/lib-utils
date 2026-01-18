@@ -64,9 +64,17 @@ reqLog.info('Processing');  // includes requestId in every message
 ## lib-1password / env.ts - initEnv(projectRoot, skipIfEnvVars?, log?)
 
 ```typescript
+import { resolve } from 'path';
 import { initEnv } from '@mdr/lib-utils/env';
 
-const result = initEnv(import.meta.dirname);              // basic - returns { parsed: {...} }
+// When .env.template is in same directory as calling file:
+initEnv(import.meta.dirname);
+
+// When .env.template is in parent directory (e.g., src/index.ts → project root):
+initEnv(resolve(import.meta.dirname, '..'));              // CORRECT: canonical path
+// initEnv(import.meta.dirname + '/..');                  // WRONG: leaves '..' unresolved
+
+// Optional parameters:
 initEnv(projectRoot, ['MY_API_KEY']);                     // skip if env vars already set
 initEnv(projectRoot, [], customLogger);                   // custom logger (must have info/error)
 ```
