@@ -10,8 +10,14 @@
 
 import type { DotenvConfigOutput } from 'dotenv';
 
+/** Logger interface - console and lib-log Logger both satisfy this */
+interface Log {
+  info(msg: string, ...args: unknown[]): void;
+  error(msg: string, ...args: unknown[]): void;
+}
+
 // Type matches lib-1password's initEnv signature
-type InitEnvFn = (root: string, skip: string[], log: Console) => DotenvConfigOutput;
+type InitEnvFn = (root: string, skip: string[], log: Log) => DotenvConfigOutput;
 
 // Try to load lib-1password at module init. Will be either:
 // - The real lib-1password module (normal case)
@@ -48,6 +54,6 @@ try {
  * @param log - Logger with info/error methods (defaults to console)
  * @returns { parsed: Record<string, string> } - The loaded/skipped env vars
  */
-export function initEnv(projectRoot: string, skipIfEnvVars: string[] = [], log = console): DotenvConfigOutput {
+export function initEnv(projectRoot: string, skipIfEnvVars: string[] = [], log: Log = console): DotenvConfigOutput {
   return lib1p.initEnv(projectRoot, skipIfEnvVars, log);
 }
