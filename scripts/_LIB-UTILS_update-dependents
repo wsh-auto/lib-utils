@@ -58,8 +58,7 @@ echo "${CYAN}Scanning ~/mnt for @mdr/lib-utils dependents...${NC}"
 
 # Find all package.json with lib-utils, excluding node_modules
 mapfile -t DEPENDENTS < <(
-  find ~/mnt -name package.json -not -path '*/node_modules/*' 2>/dev/null | \
-  xargs grep -l '@mdr/lib-utils' 2>/dev/null | \
+  rg -l '@mdr/lib-utils' ~/mnt --glob '**/package.json' --glob '!**/node_modules/**' --no-ignore --no-messages | \
   xargs -I{} dirname {} | \
   sort
 )
