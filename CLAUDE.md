@@ -10,11 +10,11 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (8.4k)
-## Documentation (800)
-- @SKILL.md (800)
+# lib-utils (8.3k)
+## Documentation (600)
+- @SKILL.md (600)
 
-## Code (1.6k)
+## Code (1.7k)
 - @scripts/_LIB-UTILS_update-dependents (900)
 - @src/env.ts (200)
 - @src/index.ts (100)

@@ -4,7 +4,7 @@
  * In CI/production without lib-log: console-based stub
  */
 
-export interface Logger {
+interface Logger {
   debug(message: string, fields?: Record<string, unknown>): void;
   info(message: string, fields?: Record<string, unknown>): void;
   warn(message: string, fields?: Record<string, unknown>): void;
@@ -21,7 +21,7 @@ function createStubLogger(name: string, parentFields: Record<string, unknown> = 
   };
 
   const stub: Logger = {
-    debug: () => {}, // Silent in stub mode
+    debug: (msg, fields) => console.log(format('debug', msg, fields)),
     info: (msg, fields) => console.log(format('info', msg, fields)),
     warn: (msg, fields) => console.warn(format('warn', msg, fields)),
     error: (msg, fields) => console.error(format('error', msg, fields)),
@@ -36,8 +36,19 @@ let libLog: { createLogger: (name: string) => Logger } | undefined;
 try {
   libLog = await import('@mdr/lib-log');
 } catch {
-  const msg = `[lib-utils] lib-log not available, using stub. Consider running: cd ${process.cwd()} && bun add file:../lib-log`;
-  process.env.CI ? console.log(msg) : console.error(msg);
+  const caller = process.argv[1] || 'unknown';
+  if (process.env.CI) {
+    console.log(`[lib-utils] lib-log not available, using stub (caller: ${caller})`);
+  } else {
+    console.error(
+      `[lib-utils] FATAL: lib-log not available.\n` +
+      `Add to optionalDependencies:\n` +
+      `  "@mdr/lib-log": "file:../lib-log"\n` +
+      `Then run: bun install\n` +
+      `(caller: ${caller})`
+    );
+    process.exit(1);
+  }
 }
 
 /**

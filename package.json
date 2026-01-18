@@ -8,8 +8,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "timeout --foreground 300 vitest run",
-    "check": "bun run typecheck && bun run test"
+    "check": "bun run typecheck"
   },
   "peerDependencies": {
     "@mdr/lib-log": "*",
@@ -23,11 +22,12 @@
       "optional": true
     }
   },
-  "devDependencies": {
+  "optionalDependencies": {
     "@mdr/lib-1password": "file:../lib-1password",
-    "@mdr/lib-log": "file:../lib-log",
+    "@mdr/lib-log": "file:../lib-log"
+  },
+  "devDependencies": {
     "@types/node": "20.13.0",
-    "typescript": "5.4.5",
-    "vitest": "^2.1.0"
+    "typescript": "5.4.5"
   }
 }
