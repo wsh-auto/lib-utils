@@ -11,31 +11,20 @@
     "./env": {
       "types": "./dist/env.d.ts",
       "default": "./src/env.ts"
+    },
+    "./browser": {
+      "types": "./dist/browser-logger.d.ts",
+      "default": "./src/browser-logger.ts"
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.check.json",
     "check": "bun run typecheck"
   },
-  "peerDependencies": {
-    "@mdr/lib-log": "*",
-    "@mdr/lib-1password": "*"
-  },
-  "peerDependenciesMeta": {
-    "@mdr/lib-log": {
-      "optional": true
-    },
-    "@mdr/lib-1password": {
-      "optional": true
-    }
-  },
-  "optionalDependencies": {
-    "@mdr/lib-1password": "file:../lib-1password",
-    "@mdr/lib-log": "file:../lib-log"
-  },
   "devDependencies": {
     "@types/node": "20.13.0",
+    "dotenv": "^17.2.3",
     "typescript": "5.4.5"
   }
 }

@@ -12,6 +12,7 @@ Utilities that enhance development but gracefully degrade in CI environments.
 |-------------|--------------|----------|------------------|----------------------|
 | `@mdr/lib-utils/logger` | lib-log | Axiom logging | Console stub | **exit(1)** |
 | `@mdr/lib-utils/env` | lib-1password | 1Password injection | No-op stub | **exit(1)** |
+| `@mdr/lib-utils/browser` | lib-log | Axiom logging | Console stub | Console stub |
 
 ## Installation
 
@@ -60,6 +61,22 @@ reqLog.info('Processing');  // includes requestId in every message
 - If `@mdr/lib-log` installed: full Axiom logging
 - If not + CI: console-based stub (debug/info/warn/error all log)
 - If not + not CI: exit(1) with instructions to add to optionalDependencies
+
+## Browser - createLogger(project-name)
+
+For frontend/browser environments (e.g., React apps bundled with Vite):
+
+```typescript
+import { createLogger } from '@mdr/lib-utils/browser';
+
+const log = createLogger('wsh:frontend');
+log.info('Page loaded');
+```
+
+**Key differences from `/logger`:**
+- No Node.js APIs (works in browsers)
+- Never exits fatally - always graceful degradation
+- Uses lazy initialization (no top-level await for Vite compatibility)
 
 ## lib-1password / env.ts - initEnv(projectRoot, skipIfEnvVars?, log?)
 
