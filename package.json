@@ -4,11 +4,18 @@
   "type": "module",
   "packageManager": "bun@1.1.45",
   "exports": {
-    "./logger": "./src/logger.ts",
-    "./env": "./src/env.ts"
+    "./logger": {
+      "types": "./dist/logger.d.ts",
+      "default": "./src/logger.ts"
+    },
+    "./env": {
+      "types": "./dist/env.d.ts",
+      "default": "./src/env.ts"
+    }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "typecheck": "tsc -p tsconfig.check.json",
     "check": "bun run typecheck"
   },
   "peerDependencies": {

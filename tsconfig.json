@@ -9,7 +9,14 @@
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "NodeNext",
     "resolveJsonModule": true,
-    "noEmit": true
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@mdr/lib-1password": ["./stubs/lib-1password.d.ts"],
+      "@mdr/lib-log": ["./stubs/lib-log.d.ts"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "test"]
