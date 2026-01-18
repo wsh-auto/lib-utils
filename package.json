@@ -4,7 +4,8 @@
   "type": "module",
   "packageManager": "bun@1.1.45",
   "exports": {
-    ".": "./src/index.ts"
+    "./logger": "./src/logger.ts",
+    "./env": "./src/env.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
