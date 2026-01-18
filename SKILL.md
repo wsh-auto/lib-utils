@@ -8,10 +8,10 @@ description: >-
 
 Utilities that enhance development but gracefully degrade in CI environments.
 
-| Optional Dep | Export | With Dep | Without Dep |
-|--------------|--------|----------|-------------|
-| lib-log | `createLogger` | Axiom logging | Console stub |
-| lib-1password | `initEnv` | 1Password injection | No-op |
+| Optional Dep | Export | With Dep | Without Dep (CI) | Without Dep (not CI) |
+|--------------|--------|----------|------------------|----------------------|
+| lib-log | `createLogger` | Axiom logging | Console stub | **exit(1)** |
+| lib-1password | `initEnv` | 1Password injection | No-op stub | **exit(1)** |
 
 ## Installation
 
@@ -31,8 +31,9 @@ bun add github:wsh-auto/lib-utils
 ```
 
 - **lib-utils**: always `github:` in dependencies - stable wrapper, rarely changes
-- **lib-log/lib-1password**: always `file:` in **optionalDependencies** - installs locally (NFS), fails silently in CI
-- **Graceful degradation**: without lib-log → console stub; without lib-1password → no-op
+- **lib-log/lib-1password**: always `file:` in **optionalDependencies** - installs locally (NFS), stubs in CI
+- **CI**: graceful degradation (console stub / no-op)
+- **Not CI**: fatal exit if optional deps missing (enforces proper setup)
 
 **For 1Password env injection**, create `.env.template` (committed) with `op://` refs:
 ```bash
@@ -57,7 +58,8 @@ reqLog.info('Processing');  // includes requestId in every message
 ```
 
 - If `@mdr/lib-log` installed: full Axiom logging
-- If not: console-based stub (info/warn/error only, debug silent)
+- If not + CI: console-based stub (debug/info/warn/error all log)
+- If not + not CI: exit(1) with instructions to add to optionalDependencies
 
 ## lib-1password / env.ts - initEnv(projectRoot, skipIfEnvVars?, log?)
 
@@ -69,8 +71,9 @@ await initEnv(projectRoot, ['MY_API_KEY']);                  // skip if env vars
 await initEnv(projectRoot, undefined, { error: myLogger });  // custom logger
 ```
 
-- If `@mdr/lib-1password` installed: delegates to its `initEnv()` (CI detection, `.env` checks, `op` CLI)
-- If not: logs warning and returns (common in CI where 1Password unavailable)
+- If `@mdr/lib-1password` installed: delegates to lib1p.initEnv() (1Password injection)
+- If not + CI: no-op stub
+- If not + not CI: exit(1) with instructions to add to optionalDependencies
 
 ## Scripts
 `scripts/_LIB-UTILS_update-dependents` - Updates all lib-utils dependents. Run with `--help` for usage.
