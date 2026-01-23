@@ -42,7 +42,8 @@ export MY_API_KEY=op://wsh/skills_my-project/API_KEY
 ```
 Add `.env` to `.gitignore` - it's generated with real values at runtime.
 
-## lib-log / logger.ts - createLogger(project-name)
+## Logging
+### lib-log / logger.ts - createLogger(project-name)
 
 ```typescript
 import { createLogger } from '@mdr/lib-utils/logger';
@@ -52,17 +53,27 @@ const log = createLogger('my-project');
 log.info('Starting');
 log.error('Failed', { code: 500 });
 await log.flush();
-
-// Child loggers inherit context
-const reqLog = log.child({ requestId: 'abc123' });
-reqLog.info('Processing');  // includes requestId in every message
 ```
 
 - If `@mdr/lib-log` installed: full Axiom logging
 - If not + CI: console-based stub (debug/info/warn/error all log)
 - If not + not CI: exit(1) with instructions to add to optionalDependencies
 
-## Browser - createLogger(project-name)
+**CLI commands must `await log.flush()`** before exit - otherwise logs may be lost (async shipping incomplete). Long-running daemons auto-flush in batches.
+
+**Shared client:** All loggers share one Axiom client. One `flush()` call drains all loggers in the process.
+
+**Output destinations:** With lib-log, logs go to both stderr (keeps stdout clean for pipeable data) and Axiom (cloud persistence).
+
+**Required logging (add these to your code):**
+- `log.info()` - MUST log: state changes (create/update/delete), external interactions (send email, API calls), recovery actions
+- `log.warn()` - MUST log: degraded state, potential issues
+- `log.error()` - MUST log: failures, exceptions
+- `log.debug()` - SHOULD log: internal function calls useful for debugging (off by default, enable via `LOG_LEVEL=debug`)
+
+**Don't log** high-volume operations at info level (>45/min: polling loops, health pings).
+
+### Browser - createLogger(project-name)
 
 For frontend/browser environments (e.g., React apps bundled with Vite):
 
@@ -77,6 +88,22 @@ log.info('Page loaded');
 - No Node.js APIs (works in browsers)
 - Never exits fatally - always graceful degradation
 - Uses lazy initialization (no top-level await for Vite compatibility)
+
+### Querying Logs: `ax` CLI
+
+**Naming convention:** Logger name = folder name. If you're in `cli-tt/`, logs are at `--project cli-tt` (auto-catches subsystems like `cli-tt:daemon`, `cli-tt:pool`).
+
+```bash
+ax                          # Logs for current folder (auto-detects)
+ax projects                 # List all project names
+ax --project '*cli-tt*'     # All cli-tt subsystems (glob pattern)
+ax --level error            # Filter by level
+ax --json                   # JSON output for agents
+```
+
+**Glob patterns:** Use `*foo*` (contains) - most useful since logger names have org prefix (e.g., `mdr:cli-tt`).
+
+See `$mdr:lib-log` for full ax documentation including APL passthrough.
 
 ## lib-1password / env.ts - initEnv(projectRoot, skipIfEnvVars?, log?)
 
@@ -103,3 +130,4 @@ initEnv(projectRoot, [], customLogger);                   // custom logger (must
 
 ## Scripts
 `scripts/_LIB-UTILS_update-dependents` - Updates all lib-utils dependents. Run with `--help` for usage.
+
