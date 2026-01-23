@@ -63,6 +63,8 @@ await log.flush();
 
 **Shared client:** All loggers share one Axiom client. One `flush()` call drains all loggers in the process.
 
+**Test teardown:** Call `await shutdown()` (not `flush()`) to close the Axiom client and allow vitest to exit cleanly.
+
 **Output destinations:** With lib-log, logs go to both stderr (keeps stdout clean for pipeable data) and Axiom (cloud persistence).
 
 **Required logging (add these to your code):**
