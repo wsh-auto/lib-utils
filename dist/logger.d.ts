@@ -23,4 +23,9 @@ interface Logger {
  * @returns Logger instance with debug/info/warn/error/child/flush methods
  */
 export declare function createLogger(name: string): Logger;
+/**
+ * Flush all pending logs and reset the shared Axiom client.
+ * Call in test teardown to allow clean process exit.
+ */
+export declare function shutdown(): Promise<void>;
 export {};

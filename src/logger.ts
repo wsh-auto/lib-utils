@@ -42,7 +42,7 @@ function createStubLogger(name: string, parentFields: Record<string, unknown> = 
 // - The real lib-log module (normal case)
 // - A stub creator function (CI case)
 // - Never assigned (non-CI failure → process.exit before reaching here)
-let libLog: { createLogger: CreateLoggerFn };
+let libLog: { createLogger: CreateLoggerFn; shutdown?: () => Promise<void> };
 try {
   libLog = await import('@mdr/lib-log');
 } catch {
@@ -73,4 +73,14 @@ try {
  */
 export function createLogger(name: string): Logger {
   return libLog.createLogger(name);
+}
+
+/**
+ * Flush all pending logs and reset the shared Axiom client.
+ * Call in test teardown to allow clean process exit.
+ */
+export async function shutdown(): Promise<void> {
+  if (libLog.shutdown) {
+    await libLog.shutdown();
+  }
 }
