@@ -24,7 +24,7 @@ interface Logger {
 type CreateLoggerFn = (name: string) => Logger;
 
 /** Create a console-based stub logger */
-function createStubLogger(name: string, parentFields: Record<string, unknown> = {}): Logger {
+function _createStubLogger(name: string, parentFields: Record<string, unknown> = {}): Logger {
   const format = (level: string, message: string, fields?: Record<string, unknown>) => {
     const allFields = { ...parentFields, ...fields };
     const fieldsStr = Object.keys(allFields).length > 0 ? ` ${JSON.stringify(allFields)}` : '';
@@ -36,7 +36,7 @@ function createStubLogger(name: string, parentFields: Record<string, unknown> = 
     info: (msg, fields) => console.info(format('info', msg, fields)),
     warn: (msg, fields) => console.warn(format('warn', msg, fields)),
     error: (msg, fields) => console.error(format('error', msg, fields)),
-    child: (fields) => createStubLogger(name, { ...parentFields, ...fields }),
+    child: (fields) => _createStubLogger(name, { ...parentFields, ...fields }),
     flush: async () => {},
   };
 }
@@ -46,7 +46,7 @@ function createStubLogger(name: string, parentFields: Record<string, unknown> = 
 let libLog: { createLogger: CreateLoggerFn } | null = null;
 let initPromise: Promise<void> | null = null;
 
-async function ensureInit(): Promise<void> {
+async function _ensureInit(): Promise<void> {
   if (libLog) return;
   if (initPromise) return initPromise;
 
@@ -58,7 +58,7 @@ async function ensureInit(): Promise<void> {
     } catch {
       // lib-log not available (CI or missing dep) - use console stub
       console.info('[lib-utils/browser] lib-log not available, using console-only logging');
-      libLog = { createLogger: createStubLogger };
+      libLog = { createLogger: _createStubLogger };
     }
   })();
 
@@ -66,7 +66,7 @@ async function ensureInit(): Promise<void> {
 }
 
 // Eagerly start initialization (non-blocking)
-ensureInit();
+_ensureInit();
 
 /**
  * Create a logger for browser environments.
@@ -82,5 +82,5 @@ export function createLogger(name: string): Logger {
   }
   // Fallback: return stub that will be used until async init completes
   // In practice, init is fast and this rarely executes
-  return createStubLogger(name);
+  return _createStubLogger(name);
 }

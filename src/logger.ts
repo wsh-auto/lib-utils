@@ -21,7 +21,7 @@ interface Logger {
 type CreateLoggerFn = (name: string) => Logger;
 
 /** Create a console-based stub logger for CI environments */
-function createStubLogger(name: string, parentFields: Record<string, unknown> = {}): Logger {
+function _createStubLogger(name: string, parentFields: Record<string, unknown> = {}): Logger {
   const format = (level: string, message: string, fields?: Record<string, unknown>) => {
     const allFields = { ...parentFields, ...fields };
     const fieldsStr = Object.keys(allFields).length > 0 ? ` ${JSON.stringify(allFields)}` : '';
@@ -33,7 +33,7 @@ function createStubLogger(name: string, parentFields: Record<string, unknown> = 
     info: (msg, fields) => console.log(format('info', msg, fields)),
     warn: (msg, fields) => console.warn(format('warn', msg, fields)),
     error: (msg, fields) => console.error(format('error', msg, fields)),
-    child: (fields) => createStubLogger(name, { ...parentFields, ...fields }),
+    child: (fields) => _createStubLogger(name, { ...parentFields, ...fields }),
     flush: async () => {},
   };
 }
@@ -50,7 +50,7 @@ try {
   if (process.env.CI) {
     // CI: lib-log not needed, use console-based stub
     console.log(`[lib-utils] lib-log not available, using stub (caller: ${caller})`);
-    libLog = { createLogger: createStubLogger };
+    libLog = { createLogger: _createStubLogger };
   } else {
     // Development: lib-log is required, fail loudly
     console.error(
