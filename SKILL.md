@@ -26,13 +26,13 @@ bun add github:wsh-auto/lib-utils
   "@mdr/lib-utils": "github:wsh-auto/lib-utils"
 },
 "optionalDependencies": {
-  "@mdr/lib-log": "file:../lib-log"
+  "@mdr/lib-log": "link:@mdr/lib-log"
 }
 ```
 
 - **Separate exports**: Import from `/logger` or `/env` - each loads only its optional dep
 - **lib-utils**: always `github:` in dependencies
-- **lib-log/lib-1password**: always `file:` in **optionalDependencies** - only include what you use
+- **lib-log/lib-1password**: always `link:` in **optionalDependencies** - only include what you use
 - **CI**: graceful degradation (console stub / no-op)
 - **Not CI**: fatal exit if optional dep missing for the export you import
 
@@ -59,19 +59,28 @@ await log.flush();
 - If not + CI: console-based stub (debug/info/warn/error all log)
 - If not + not CI: exit(1) with instructions to add to optionalDependencies
 
-**CLI commands must `await log.flush()`** before exit - otherwise logs may be lost (async shipping incomplete). Long-running daemons auto-flush in batches.
+**CLI commands must `await shutdown()`** before exit - flushes pending logs AND releases the Axiom handle so the process exits cleanly. Without it, the Axiom connection keeps the event loop alive (~2s hang). Long-running daemons don't need `shutdown()`.
 
-**Shared client:** All loggers share one Axiom client. One `flush()` call drains all loggers in the process.
+**`flush()` vs `shutdown()`:** `flush()` sends pending logs but keeps the Axiom handle open (useful mid-process). `shutdown()` flushes + sets the shared client to `undefined`, releasing the handle.
+
+**Shared client:** All loggers share one Axiom client. One `shutdown()` call drains and closes all loggers in the process.
 
 **Test teardown:** Call `await shutdown()` (not `flush()`) to close the Axiom client and allow vitest to exit cleanly.
 
-**Output destinations:** With lib-log, logs go to both stderr (keeps stdout clean for pipeable data) and Axiom (cloud persistence).
+**Output destinations:** With lib-log, logs go to both stderr (keeps stdout clean for pipeable data) and Axiom (cloud persistence). PM2 captures stderr but only shows info+ level - `log.debug()` entries are invisible in `pm2 logs` but ship to Axiom. When debugging, always use `ax` CLI over `pm2 logs` (see `$mdr:dev-debug`).
+
+**CLI logging policy:**
+- `stdout` - command output only (JSON, IDs, paths, tables)
+- `stderr` - human status/progress (keep `stdout` pipeable)
+- `--help`/`--version` - no need for logging
+- "CLI invoked" / argv dumps - `log.debug()` only, never on `--help`/`--version`, never include secrets
+- If per-item status is already printed, log per-item at `debug` and keep `info` for summaries and durable side effects
 
 **Required logging (add these to your code):**
 - `log.info()` - MUST log: state changes (create/update/delete), external interactions (send email, API calls), recovery actions
 - `log.warn()` - MUST log: degraded state, potential issues
 - `log.error()` - MUST log: failures, exceptions
-- `log.debug()` - SHOULD log: internal function calls useful for debugging (off by default, enable via `LOG_LEVEL=debug`)
+- `log.debug()` - SHOULD log: internal function calls useful for debugging (on by default, suppress with `LOG_LEVEL=info`)
 
 **Don't log** high-volume operations at info level (>45/min: polling loops, health pings).
 
@@ -132,4 +141,3 @@ initEnv(projectRoot, [], customLogger);                   // custom logger (must
 
 ## Scripts
 `scripts/_LIB-UTILS_update-dependents` - Updates all lib-utils dependents. Run with `--help` for usage.
-
