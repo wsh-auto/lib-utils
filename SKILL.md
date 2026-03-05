@@ -59,7 +59,7 @@ await log.flush();
 - If not + CI: console-based stub (debug/info/warn/error all log)
 - If not + not CI: exit(1) with instructions to add to optionalDependencies
 
-**CLI commands must `await shutdown()`** before exit - flushes pending logs AND releases the Axiom handle so the process exits cleanly. Without it, the Axiom connection keeps the event loop alive (~2s hang). Long-running daemons don't need `shutdown()`.
+**CLI commands must `await shutdown()`** before exit - flushes pending logs and releases the Axiom handle. Long-running daemons don't need `shutdown()`. lib-log's `shutdown()` has a 5s safety timeout so callers don't need to add their own.
 
 **`flush()` vs `shutdown()`:** `flush()` sends pending logs but keeps the Axiom handle open (useful mid-process). `shutdown()` flushes + sets the shared client to `undefined`, releasing the handle.
 
@@ -67,7 +67,7 @@ await log.flush();
 
 **Test teardown:** Call `await shutdown()` (not `flush()`) to close the Axiom client and allow vitest to exit cleanly.
 
-**Output destinations:** With lib-log, logs go to both stderr (keeps stdout clean for pipeable data) and Axiom (cloud persistence). PM2 captures stderr but only shows info+ level - `log.debug()` entries are invisible in `pm2 logs` but ship to Axiom. When debugging, always use `ax` CLI over `pm2 logs` (see `$mdr:dev-debug`).
+**Output destinations:** With lib-log, logs go to both stderr (keeps stdout clean for pipeable data) and Axiom (cloud persistence). Runtime logs may hide debug-level entries, so validate with Axiom queries (`ax`) instead of relying only on service logs.
 
 **CLI logging policy:**
 - `stdout` - command output only (JSON, IDs, paths, tables)
@@ -83,6 +83,8 @@ await log.flush();
 - `log.debug()` - SHOULD log: internal function calls useful for debugging (on by default, suppress with `LOG_LEVEL=info`)
 
 **Don't log** high-volume operations at info level (>45/min: polling loops, health pings).
+
+**CLI log level: default to warn.** CLIs have their own colored display; structured logs clutter the terminal. The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=warn` for all CLIs automatically. Daemons managed by `pmm` don't go through the wrapper, so they keep debug. All levels still ship to Axiom. Override with `LOG_LEVEL=debug mycli ...`.
 
 ### Browser - createLogger(project-name)
 

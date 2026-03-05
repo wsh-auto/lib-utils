@@ -1,10 +1,53 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+- Pay special attention to the Repository Description. These contain important context and guidelines specific to this project.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files are sorted by Git change count (files with more changes are at the bottom)
+
+
 ================================================================
 User Provided Header
 ================================================================
 <!-- User Provided Header -->
 AGENTS context for lib-utils
 
-PRIMARY: SKILL.md (1.6k) - How to use; self-contained
+PRIMARY: SKILL.md (1.7k) - How to use; self-contained
 
 ## Other Documentation
 - @CONTRIBUTING.md (600) - How to develop/maintain
@@ -30,6 +73,27 @@ Review process:
   - **CRITICAL:** Do NOT stop after finding one issue. Report all issues of all severities in one go.
 
 ================================================================
+Directory Structure
+================================================================
+edit-skill/
+  SKILL.md
+lib-1password/
+  SKILL.md
+lib-log/
+  README.md
+  SKILL.md
+lib-utils/
+  scripts/
+    _LIB-UTILS_update-dependents
+  src/
+    env.ts
+    logger.ts
+  CLAUDE.md
+  CONTRIBUTING.md
+  package.json
+  SKILL.md
+
+================================================================
 Files
 ================================================================
 
@@ -41,9 +105,8 @@ name: edit-skill
 description: >-
   Guide for editing and creating Skills. This skill should be used when users want to edit an existing Skill or create a new Skill that extends agentic capabilities with specialized knowledge, workflows, or tool integrations.
 source: ~/mnt/data/mirrors/openai/skills/skills/.system/skill-creator/
-hackmd: https://hackmd.io/TmfBsoskTnGqEf90YZch5Q
+hackmd: https://hackmd.io/DcMwu0jNRuWOyQtrOVax-w
 ---
-
 # Skill Editor and Builder
 
 ## TABLE OF CONTENTS
@@ -113,6 +176,8 @@ All skills must follow the naming conventions in ../CONTRIBUTING.md. Key prefixe
 - **task-***: Conversational output workflows (e.g., task-classify-conversation)
 - **workflow-***: Multi-step file creation workflows (e.g., workflow-project)
 - **query-***: External service/API interaction (e.g., query-airtable, query-hackmd)
+- **help-***: Operational guides for third-party CLI tools (e.g., help-claude, help-codex, help-gemini)
+- **cli-***: Our own CLI tools with source code (e.g., cli-mdr, cli-repomix, cli-tt, cli-bash)
 - **dev-***: Development tooling & workflows (e.g., dev-mcp-server)
 - **ops-***: Operations & infrastructure tools (e.g., ops-git, ops-pm2)
 - **test-***: Testing tools & workflows (e.g., test-mcp-server, test-playwright)
@@ -145,7 +210,7 @@ Skills use a three-level loading system to manage context efficiently:
 
 ## YAML Metadata
 ### name: and description:
-`name:`** and **`description:`** determine when Claude will use the skill. Be specific about what the skill does and when to use it. Use the third-person (e.g. "This skill should be used when..." instead of "Use this skill when..."). For description, use `>-` folded block scalar with content on single line (no 80-char wrapping).
+`name:`** and **`description:`** determine when Claude will use the skill. Be specific about what the skill does and when to use it. Use the third-person (e.g. "This skill should be used when..." instead of "Use this skill when..."). For description, use `>-` folded block scalar with content on a single line (never hard-wrap).
 
 ### host:
 **`host:`** - Specify when a skill must run on a specific machine (e.g., browser automation, apps only installed there):
@@ -1234,9 +1299,9 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (13k)
-## Documentation (2.4k)
-- @SKILL.md (1.6k)
+# lib-utils (13.1k)
+## Documentation (2.5k)
+- @SKILL.md (1.7k)
 - @CONTRIBUTING.md (600)
 - @package.json (300)
 
@@ -1246,7 +1311,7 @@ requiredFiles:
 - @src/logger.ts (800)
 
 ## requiredSkills (8k)
-- [@../edit-skill/SKILL.md (3k)](https://hackmd.io/TmfBsoskTnGqEf90YZch5Q)
+- [@../edit-skill/SKILL.md (3k)](https://hackmd.io/DcMwu0jNRuWOyQtrOVax-w)
 - @../lib-1password/SKILL.md (2k)
 - @../lib-log/SKILL.md (2k)
   - @../lib-log/README.md (1k)
@@ -1316,9 +1381,15 @@ File: lib-utils/package.json
   "packageManager": "bun@1.1.45",
   "typesVersions": {
     "*": {
-      "logger": ["dist/logger.d.ts"],
-      "env": ["dist/env.d.ts"],
-      "browser": ["dist/browser-logger.d.ts"]
+      "logger": [
+        "dist/logger.d.ts"
+      ],
+      "env": [
+        "dist/env.d.ts"
+      ],
+      "browser": [
+        "dist/browser-logger.d.ts"
+      ]
     }
   },
   "exports": {
@@ -1340,7 +1411,9 @@ File: lib-utils/package.json
     "typecheck": "tsc -p tsconfig.check.json",
     "check": "bun run typecheck",
     "lint": "eslint '{src,test}/**/*.ts'",
-    "lint:fix": "eslint '{src,test}/**/*.ts' --fix"
+    "lint:fix": "eslint '{src,test}/**/*.ts' --fix",
+    "with-lock:install": "with-lock --project-root . -- bun install",
+    "preinstall": "with-lock preinstall-guard @mdr/lib-utils"
   },
   "devDependencies": {
     "@eslint/js": "8.57.0",
@@ -1417,7 +1490,7 @@ await log.flush();
 - If not + CI: console-based stub (debug/info/warn/error all log)
 - If not + not CI: exit(1) with instructions to add to optionalDependencies
 
-**CLI commands must `await shutdown()`** before exit - flushes pending logs AND releases the Axiom handle so the process exits cleanly. Without it, the Axiom connection keeps the event loop alive (~2s hang). Long-running daemons don't need `shutdown()`.
+**CLI commands must `await shutdown()`** before exit - flushes pending logs and releases the Axiom handle. Long-running daemons don't need `shutdown()`. lib-log's `shutdown()` has a 5s safety timeout so callers don't need to add their own.
 
 **`flush()` vs `shutdown()`:** `flush()` sends pending logs but keeps the Axiom handle open (useful mid-process). `shutdown()` flushes + sets the shared client to `undefined`, releasing the handle.
 
@@ -1430,7 +1503,7 @@ await log.flush();
 **CLI logging policy:**
 - `stdout` - command output only (JSON, IDs, paths, tables)
 - `stderr` - human status/progress (keep `stdout` pipeable)
-- `--help`/`--version` - print and exit before initializing logging
+- `--help`/`--version` - no need for logging
 - "CLI invoked" / argv dumps - `log.debug()` only, never on `--help`/`--version`, never include secrets
 - If per-item status is already printed, log per-item at `debug` and keep `info` for summaries and durable side effects
 
@@ -1441,6 +1514,8 @@ await log.flush();
 - `log.debug()` - SHOULD log: internal function calls useful for debugging (on by default, suppress with `LOG_LEVEL=info`)
 
 **Don't log** high-volume operations at info level (>45/min: polling loops, health pings).
+
+**CLI log level: default to warn.** CLIs have their own colored display; structured logs clutter the terminal. The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=warn` for all CLIs automatically. Daemons (PM2) don't go through the wrapper so they keep debug. All levels still ship to Axiom. Override with `LOG_LEVEL=debug mycli ...`.
 
 ### Browser - createLogger(project-name)
 
