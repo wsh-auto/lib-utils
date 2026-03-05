@@ -5,9 +5,15 @@
   "packageManager": "bun@1.1.45",
   "typesVersions": {
     "*": {
-      "logger": ["dist/logger.d.ts"],
-      "env": ["dist/env.d.ts"],
-      "browser": ["dist/browser-logger.d.ts"]
+      "logger": [
+        "dist/logger.d.ts"
+      ],
+      "env": [
+        "dist/env.d.ts"
+      ],
+      "browser": [
+        "dist/browser-logger.d.ts"
+      ]
     }
   },
   "exports": {
@@ -29,7 +35,9 @@
     "typecheck": "tsc -p tsconfig.check.json",
     "check": "bun run typecheck",
     "lint": "eslint '{src,test}/**/*.ts'",
-    "lint:fix": "eslint '{src,test}/**/*.ts' --fix"
+    "lint:fix": "eslint '{src,test}/**/*.ts' --fix",
+    "with-lock:install": "with-lock --project-root . -- bun install",
+    "preinstall": "with-lock preinstall-guard @mdr/lib-utils"
   },
   "devDependencies": {
     "@eslint/js": "8.57.0",
