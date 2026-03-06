@@ -67,11 +67,11 @@ await log.flush();
 
 **Test teardown:** Call `await shutdown()` (not `flush()`) to close the Axiom client and allow vitest to exit cleanly.
 
-**Output destinations:** With lib-log, logs go to both stderr (keeps stdout clean for pipeable data) and Axiom (cloud persistence). Runtime logs may hide debug-level entries, so validate with Axiom queries (`ax`) instead of relying only on service logs.
+**Output destinations:** With lib-log, logs go to both stderr and Axiom (cloud persistence). Runtime logs may hide debug-level entries, so validate with Axiom queries (`ax`) instead of relying only on service logs.
 
 **CLI logging policy:**
-- `stdout` - command output only (JSON, IDs, paths, tables)
-- `stderr` - human status/progress (keep `stdout` pipeable)
+- `stdout` - composable data only (JSON, IDs, paths, tables). Must contain nothing that wouldn't make sense piped to another program. Banned: `console.log` for progress/status messages.
+- `stderr` - everything useful for debugging later (state, status, progress, decisions, errors). MUST go through lib-log (`log.info`/`log.debug`/etc.), never via raw `console.error`. lib-log sends to both stderr and Axiom, so anything logged is queryable. (2026-03: ops-pmm `outputHuman` used `console.log` for progress, bypassing both lib-log and stderr.)
 - `--help`/`--version` - no need for logging
 - "CLI invoked" / argv dumps - `log.debug()` only, never on `--help`/`--version`, never include secrets
 - If per-item status is already printed, log per-item at `debug` and keep `info` for summaries and durable side effects

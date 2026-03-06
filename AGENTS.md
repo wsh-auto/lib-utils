@@ -47,7 +47,7 @@ User Provided Header
 <!-- User Provided Header -->
 AGENTS context for lib-utils
 
-PRIMARY: SKILL.md (1.7k) - How to use; self-contained
+PRIMARY: SKILL.md (1.8k) - How to use; self-contained
 
 ## Other Documentation
 - @CONTRIBUTING.md (600) - How to develop/maintain
@@ -179,7 +179,7 @@ All skills must follow the naming conventions in ../CONTRIBUTING.md. Key prefixe
 - **help-***: Operational guides for third-party CLI tools (e.g., help-claude, help-codex, help-gemini)
 - **cli-***: Our own CLI tools with source code (e.g., cli-mdr, cli-repomix, cli-tt, cli-bash)
 - **dev-***: Development tooling & workflows (e.g., dev-mcp-server)
-- **ops-***: Operations & infrastructure tools (e.g., ops-git, ops-pm2)
+- **ops-***: Operations & infrastructure tools (e.g., ops-git, ops-pmm)
 - **test-***: Testing tools & workflows (e.g., test-mcp-server, test-playwright)
 - **interface-***: ChatGPT.com customization (e.g., interface-chatgpt-memory)
 
@@ -618,7 +618,7 @@ All TypeScript projects migrated to import from `@mdr/lib-utils` on 2026-01-16.
 | mon-litellm | B | mdr:mon-litellm, :api |
 | mon-openwebui | C | mdr:mon-openwebui |
 | ops-frontmatter | C | mdr:ops-frontmatter |
-| ops-pm2 | B | mdr:ops-pm2:start, :stop, :restart, :doctor, :fleet, :health, :pm2 |
+| ops-pmm | B | mdr:ops-pmm:start, :stop, :restart, :doctor, :fleet, :health, :overmind |
 | ops-sysguard | A | mdr:ops-sysguard:actions, :daemon, :metrics, :monitor, :processes |
 | ops-watch | A | mdr:ops-watch, :cli |
 | query-airtable | A | mdr:query-airtable |
@@ -1299,9 +1299,9 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (13.1k)
-## Documentation (2.5k)
-- @SKILL.md (1.7k)
+# lib-utils (13.2k)
+## Documentation (2.6k)
+- @SKILL.md (1.8k)
 - @CONTRIBUTING.md (600)
 - @package.json (300)
 
@@ -1498,11 +1498,11 @@ await log.flush();
 
 **Test teardown:** Call `await shutdown()` (not `flush()`) to close the Axiom client and allow vitest to exit cleanly.
 
-**Output destinations:** With lib-log, logs go to both stderr (keeps stdout clean for pipeable data) and Axiom (cloud persistence). PM2 captures stderr but only shows info+ level - `log.debug()` entries are invisible in `pm2 logs` but ship to Axiom. When debugging, always use `ax` CLI over `pm2 logs` (see `$mdr:dev-debug`).
+**Output destinations:** With lib-log, logs go to both stderr and Axiom (cloud persistence). Runtime logs may hide debug-level entries, so validate with Axiom queries (`ax`) instead of relying only on service logs.
 
 **CLI logging policy:**
-- `stdout` - command output only (JSON, IDs, paths, tables)
-- `stderr` - human status/progress (keep `stdout` pipeable)
+- `stdout` - composable data only (JSON, IDs, paths, tables). Must contain nothing that wouldn't make sense piped to another program. Banned: `console.log` for progress/status messages.
+- `stderr` - everything useful for debugging later (state, status, progress, decisions, errors). MUST go through lib-log (`log.info`/`log.debug`/etc.), never via raw `console.error`. lib-log sends to both stderr and Axiom, so anything logged is queryable. (2026-03: ops-pmm `outputHuman` used `console.log` for progress, bypassing both lib-log and stderr.)
 - `--help`/`--version` - no need for logging
 - "CLI invoked" / argv dumps - `log.debug()` only, never on `--help`/`--version`, never include secrets
 - If per-item status is already printed, log per-item at `debug` and keep `info` for summaries and durable side effects
@@ -1515,7 +1515,7 @@ await log.flush();
 
 **Don't log** high-volume operations at info level (>45/min: polling loops, health pings).
 
-**CLI log level: default to warn.** CLIs have their own colored display; structured logs clutter the terminal. The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=warn` for all CLIs automatically. Daemons (PM2) don't go through the wrapper so they keep debug. All levels still ship to Axiom. Override with `LOG_LEVEL=debug mycli ...`.
+**CLI log level: default to warn.** CLIs have their own colored display; structured logs clutter the terminal. The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=warn` for all CLIs automatically. Daemons managed by `pmm` don't go through the wrapper, so they keep debug. All levels still ship to Axiom. Override with `LOG_LEVEL=debug mycli ...`.
 
 ### Browser - createLogger(project-name)
 
