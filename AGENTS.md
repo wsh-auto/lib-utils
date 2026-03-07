@@ -47,7 +47,7 @@ User Provided Header
 <!-- User Provided Header -->
 AGENTS context for lib-utils
 
-PRIMARY: SKILL.md (1.8k) - How to use; self-contained
+PRIMARY: SKILL.md (1.7k) - How to use; self-contained
 
 ## Other Documentation
 - @CONTRIBUTING.md (600) - How to develop/maintain
@@ -1301,7 +1301,7 @@ requiredFiles:
 
 # lib-utils (13.2k)
 ## Documentation (2.6k)
-- @SKILL.md (1.8k)
+- @SKILL.md (1.7k)
 - @CONTRIBUTING.md (600)
 - @package.json (300)
 
@@ -1515,7 +1515,7 @@ await log.flush();
 
 **Don't log** high-volume operations at info level (>45/min: polling loops, health pings).
 
-**CLI log level: default to warn.** CLIs have their own colored display; structured logs clutter the terminal. The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=warn` for all CLIs automatically. Daemons managed by `pmm` don't go through the wrapper, so they keep debug. All levels still ship to Axiom. Override with `LOG_LEVEL=debug mycli ...`.
+**CLI log level: default to info.** The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `debug` via `overmind.env`. All levels still ship to Axiom. Override with `LOG_LEVEL=debug mycli ...`.
 
 ### Browser - createLogger(project-name)
 

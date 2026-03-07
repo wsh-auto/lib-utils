@@ -84,7 +84,7 @@ await log.flush();
 
 **Don't log** high-volume operations at info level (>45/min: polling loops, health pings).
 
-**CLI log level: default to warn.** CLIs have their own colored display; structured logs clutter the terminal. The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=warn` for all CLIs automatically. Daemons managed by `pmm` don't go through the wrapper, so they keep debug. All levels still ship to Axiom. Override with `LOG_LEVEL=debug mycli ...`.
+**CLI log level: default to info.** The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `debug` via `overmind.env`. All levels still ship to Axiom. Override with `LOG_LEVEL=debug mycli ...`.
 
 ### Browser - createLogger(project-name)
 
