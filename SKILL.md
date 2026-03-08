@@ -2,8 +2,8 @@
 name: lib-utils
 description: >-
   CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup.
+hackmd: https://hackmd.io/gFtXBvMiQZ65Rfog7WmV-w
 ---
-
 # lib-utils
 
 Utilities that enhance development but gracefully degrade in CI environments.
@@ -13,6 +13,15 @@ Utilities that enhance development but gracefully degrade in CI environments.
 | `@mdr/lib-utils/logger` | lib-log | Axiom logging | Console stub | **exit(1)** |
 | `@mdr/lib-utils/env` | lib-1password | 1Password injection | No-op stub | **exit(1)** |
 | `@mdr/lib-utils/browser` | lib-log | Axiom logging | Console stub | Console stub |
+
+## TABLE OF CONTENTS
+1. Installation
+2. Logging
+  - lib-log / logger.ts - createLogger(project-name)
+  - Browser - createLogger(project-name)
+  - Querying Logs: `ax` CLI
+3. lib-1password / env.ts - initEnv(projectRoot, skipIfEnvVars?, log?)
+4. Scripts
 
 ## Installation
 
@@ -71,7 +80,7 @@ await log.flush();
 
 **CLI logging policy:**
 - `stdout` - composable data only (JSON, IDs, paths, tables). Must contain nothing that wouldn't make sense piped to another program. Banned: `console.log` for progress/status messages.
-- `stderr` - everything useful for debugging later (state, status, progress, decisions, errors). MUST go through lib-log (`log.info`/`log.debug`/etc.), never via raw `console.error`. lib-log sends to both stderr and Axiom, so anything logged is queryable. (2026-03: ops-pmm `outputHuman` used `console.log` for progress, bypassing both lib-log and stderr.)
+- `stderr` - everything useful for debugging later (state, status, progress, decisions, errors). MUST go through lib-log (`log.info`/`log.debug`/etc.), never via raw `console.error`. `log.*()` already writes to stderr via `StderrTransport` and also ships to Axiom, so `console.error` double-prints locally while bypassing structured logging and cloud persistence. For CLI catch blocks, use `log.warn()` for handled exits and `log.error()` for bug paths; see `$mdr:dev-core` for the single-exit pattern.
 - `--help`/`--version` - no need for logging
 - "CLI invoked" / argv dumps - `log.debug()` only, never on `--help`/`--version`, never include secrets
 - If per-item status is already printed, log per-item at `debug` and keep `info` for summaries and durable side effects
@@ -82,9 +91,9 @@ await log.flush();
 - `log.error()` - MUST log: failures, exceptions
 - `log.debug()` - SHOULD log: internal function calls useful for debugging (on by default, suppress with `LOG_LEVEL=info`)
 
-**Don't log** high-volume operations at info level (>45/min: polling loops, health pings).
+**Don't log** high-volume operations at info level (>45/min: e.g. polling loops).
 
-**CLI log level: default to info.** The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `debug` via `overmind.env`. All levels still ship to Axiom. Override with `LOG_LEVEL=debug mycli ...`.
+The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `LOG_LEVL=debug` via `overmind.env`. All levels still ship to Axiom.
 
 ### Browser - createLogger(project-name)
 
@@ -115,6 +124,8 @@ ax --json                   # JSON output for agents
 ```
 
 **Glob patterns:** Use `*foo*` (contains) - most useful since logger names have org prefix (e.g., `mdr:cli-tt`).
+
+**Filtering by metadata:** Use APL passthrough for field filtering (`ax "['wsh-logs'] | extend ctx = parse_json(context) | where ctx.field == 'value'" --project '*foo*'`). Do NOT use `--json | python3` - APL is faster and wastes less context.
 
 See `$mdr:lib-log` for full ax documentation including APL passthrough.
 

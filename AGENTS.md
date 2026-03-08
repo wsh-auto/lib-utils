@@ -47,7 +47,7 @@ User Provided Header
 <!-- User Provided Header -->
 AGENTS context for lib-utils
 
-PRIMARY: SKILL.md (1.7k) - How to use; self-contained
+PRIMARY: SKILL.md (1.9k) - How to use; self-contained
 
 ## Other Documentation
 - @CONTRIBUTING.md (600) - How to develop/maintain
@@ -681,11 +681,29 @@ description: >-
   to any project or querying logs with the ax CLI.
 requiredFiles:
   - README.md
+hackmd: https://hackmd.io/qX8wO9lCQ8m1e3NPBeEitg
 ---
-
 # lib-log
 
 Centralized logging using Axiom (1TB/month free). See @README.md for list of users.
+
+## TABLE OF CONTENTS
+1. Consumer Matrix
+2. TypeScript (Node.js)
+3. Python
+4. Frontend (Browser)
+5. CLI: `ax`
+  - Filtering by Metadata Fields: Use APL Passthrough; Banned: `--json | python3`
+6. Configuration
+  - Tokens (1Password: `wsh/skills_lib-log`)
+  - Other Variables
+7. Output Format
+8. Auto-Detected Fields
+9. Project Naming Convention
+10. Project Status
+11. Logging Large Values
+12. Error Logging
+13. Agent Guidelines
 
 ## Consumer Matrix
 
@@ -785,6 +803,29 @@ ax --full                           # Don't truncate field values
 ax "['wsh-logs'] | where message contains 'error'" --all
 ax "['wsh-logs']" --level warn --limit 50 --all
 ```
+
+### Filtering by Metadata Fields: Use APL Passthrough; Banned: `--json | python3`
+**Use APL passthrough to filter logs by metadata.** Do NOT pipe `--json` through `python3` or `jq` for filtering - APL does it server-side, faster, and with less agent context waste.
+
+Top-level columns (`level`, `project`, `hostname`, `message`) use flags or simple APL:
+```bash
+ax --level error --start-time 2h             # Flag-based (simplest)
+ax "['wsh-logs'] | where hostname == 'm3'" --start-time 1h --all
+```
+
+Custom fields in `context` JSON column need `parse_json()`:
+```bash
+# Filter by a field passed via log.info('msg', { paneId: '78' })
+ax "['wsh-logs'] | extend ctx = parse_json(context) | where ctx.paneId == '78'" --project '*cli-tt*' --start-time 24h
+
+# Filter by error code
+ax "['wsh-logs'] | extend err = parse_json(error) | where err.code == 'ETIMEDOUT'" --start-time 1d
+
+# Combine with text search
+ax "['wsh-logs'] | where message contains 'cleanup' | extend ctx = parse_json(context) | where ctx.agentId == '2:1'" --project '*cli-tt*'
+```
+
+Flags merge with APL: `--project`, `--level`, `--start-time`, `--limit` are appended to your APL query automatically.
 
 **Glob patterns:** Use `*foo*` (contains) - most useful since logger names have org prefix (e.g., `mdr:cli-tt`). Also supports `foo*` (startswith), `*foo` (endswith).
 
@@ -1299,9 +1340,9 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (13.2k)
-## Documentation (2.6k)
-- @SKILL.md (1.7k)
+# lib-utils (14.4k)
+## Documentation (2.8k)
+- [@SKILL.md (1.9k)](https://hackmd.io/gFtXBvMiQZ65Rfog7WmV-w)
 - @CONTRIBUTING.md (600)
 - @package.json (300)
 
@@ -1310,10 +1351,10 @@ requiredFiles:
 - @src/env.ts (600)
 - @src/logger.ts (800)
 
-## requiredSkills (8k)
+## requiredSkills (9k)
 - [@../edit-skill/SKILL.md (3k)](https://hackmd.io/DcMwu0jNRuWOyQtrOVax-w)
 - @../lib-1password/SKILL.md (2k)
-- @../lib-log/SKILL.md (2k)
+- [@../lib-log/SKILL.md (3k)](https://hackmd.io/qX8wO9lCQ8m1e3NPBeEitg)
   - @../lib-log/README.md (1k)
 
 ================
@@ -1433,8 +1474,8 @@ File: lib-utils/SKILL.md
 name: lib-utils
 description: >-
   CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup.
+hackmd: https://hackmd.io/gFtXBvMiQZ65Rfog7WmV-w
 ---
-
 # lib-utils
 
 Utilities that enhance development but gracefully degrade in CI environments.
@@ -1444,6 +1485,15 @@ Utilities that enhance development but gracefully degrade in CI environments.
 | `@mdr/lib-utils/logger` | lib-log | Axiom logging | Console stub | **exit(1)** |
 | `@mdr/lib-utils/env` | lib-1password | 1Password injection | No-op stub | **exit(1)** |
 | `@mdr/lib-utils/browser` | lib-log | Axiom logging | Console stub | Console stub |
+
+## TABLE OF CONTENTS
+1. Installation
+2. Logging
+  - lib-log / logger.ts - createLogger(project-name)
+  - Browser - createLogger(project-name)
+  - Querying Logs: `ax` CLI
+3. lib-1password / env.ts - initEnv(projectRoot, skipIfEnvVars?, log?)
+4. Scripts
 
 ## Installation
 
@@ -1502,7 +1552,7 @@ await log.flush();
 
 **CLI logging policy:**
 - `stdout` - composable data only (JSON, IDs, paths, tables). Must contain nothing that wouldn't make sense piped to another program. Banned: `console.log` for progress/status messages.
-- `stderr` - everything useful for debugging later (state, status, progress, decisions, errors). MUST go through lib-log (`log.info`/`log.debug`/etc.), never via raw `console.error`. lib-log sends to both stderr and Axiom, so anything logged is queryable. (2026-03: ops-pmm `outputHuman` used `console.log` for progress, bypassing both lib-log and stderr.)
+- `stderr` - everything useful for debugging later (state, status, progress, decisions, errors). MUST go through lib-log (`log.info`/`log.debug`/etc.), never via raw `console.error`. `log.*()` already writes to stderr via `StderrTransport` and also ships to Axiom, so `console.error` double-prints locally while bypassing structured logging and cloud persistence. For CLI catch blocks, use `log.warn()` for handled exits and `log.error()` for bug paths; see `$mdr:dev-core` for the single-exit pattern.
 - `--help`/`--version` - no need for logging
 - "CLI invoked" / argv dumps - `log.debug()` only, never on `--help`/`--version`, never include secrets
 - If per-item status is already printed, log per-item at `debug` and keep `info` for summaries and durable side effects
@@ -1513,7 +1563,7 @@ await log.flush();
 - `log.error()` - MUST log: failures, exceptions
 - `log.debug()` - SHOULD log: internal function calls useful for debugging (on by default, suppress with `LOG_LEVEL=info`)
 
-**Don't log** high-volume operations at info level (>45/min: polling loops, health pings).
+**Don't log** high-volume operations at info level (>45/min: e.g. polling loops).
 
 **CLI log level: default to info.** The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `debug` via `overmind.env`. All levels still ship to Axiom. Override with `LOG_LEVEL=debug mycli ...`.
 
@@ -1546,6 +1596,8 @@ ax --json                   # JSON output for agents
 ```
 
 **Glob patterns:** Use `*foo*` (contains) - most useful since logger names have org prefix (e.g., `mdr:cli-tt`).
+
+**Filtering by metadata:** Use APL passthrough for field filtering (`ax "['wsh-logs'] | extend ctx = parse_json(context) | where ctx.field == 'value'" --project '*foo*'`). Do NOT use `--json | python3` - APL is faster and wastes less context.
 
 See `$mdr:lib-log` for full ax documentation including APL passthrough.
 
