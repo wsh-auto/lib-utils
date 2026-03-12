@@ -105,34 +105,34 @@ name: edit-skill
 description: >-
   Guide for editing and creating Skills. This skill should be used when users want to edit an existing Skill or create a new Skill that extends agentic capabilities with specialized knowledge, workflows, or tool integrations.
 source: ~/mnt/data/mirrors/openai/skills/skills/.system/skill-creator/
-hackmd: https://hackmd.io/DcMwu0jNRuWOyQtrOVax-w
+hackmd: https://hackmd.io/arh_StRpSZu_IqtLyyJipQ
 ---
 # Skill Editor and Builder
 
 ## TABLE OF CONTENTS
-1. REQUIRED READING
+- REQUIRED READING
   - If creating a New Skill
   - If creating/editing a "query-" skill (API integration), MUST also read:
   - If creating/editing an "audit-" skill (quality validation), MUST also read:
-2. About Skills
+- About Skills
   - Naming Skills
   - Anatomy of a Skill
   - Progressive Disclosure Design Principle
-3. YAML Metadata
+- YAML Metadata
   - name: and description:
   - host:
-4. Bundled Resources Details
+- Bundled Resources Details
   - scripts/
   - references/
   - assets/
-5. Process for Editing Skills
+- Process for Editing Skills
   - Understanding Existing Structure
   - Making Effective Edits
   - Generate CLAUDE.md
   - Validation Workflow
   - Testing Script Changes
   - Audit with `$mdr:audit-skill`
-6. $edit-skill Scripts
+- $edit-skill Scripts
   - ccsync
 
 ## REQUIRED READING
@@ -331,18 +331,18 @@ description: >-
 # 1Password CLI (op) - Secrets Management
 
 ## TABLE OF CONTENTS
-1. Current Setup
-2. Vendored Binaries
-3. Authentication
+- Current Setup
+- Vendored Binaries
+- Authentication
   - Service Account (Headless)
   - Interactive (Touch ID)
-4. Reading Secrets
+- Reading Secrets
   - Single Value
   - All Fields (One Call)
   - Environment Injection
-5. Migrating Hardcoded Secrets
+- Migrating Hardcoded Secrets
   - Preferred Pattern: Template + Lazy Inject
-6. Troubleshooting
+- Troubleshooting
 
 ## Current Setup
 **Already installed.** Configuration lives in:
@@ -688,22 +688,22 @@ hackmd: https://hackmd.io/qX8wO9lCQ8m1e3NPBeEitg
 Centralized logging using Axiom (1TB/month free). See @README.md for list of users.
 
 ## TABLE OF CONTENTS
-1. Consumer Matrix
-2. TypeScript (Node.js)
-3. Python
-4. Frontend (Browser)
-5. CLI: `ax`
+- Consumer Matrix
+- TypeScript (Node.js)
+- Python
+- Frontend (Browser)
+- CLI: `ax`
   - Filtering by Metadata Fields: Use APL Passthrough; Banned: `--json | python3`
-6. Configuration
+- Configuration
   - Tokens (1Password: `wsh/skills_lib-log`)
   - Other Variables
-7. Output Format
-8. Auto-Detected Fields
-9. Project Naming Convention
-10. Project Status
-11. Logging Large Values
-12. Error Logging
-13. Agent Guidelines
+- Output Format
+- Auto-Detected Fields
+- Project Naming Convention
+- Project Status
+- Logging Large Values
+- Error Logging
+- Agent Guidelines
 
 ## Consumer Matrix
 
@@ -825,7 +825,7 @@ ax "['wsh-logs'] | extend err = parse_json(error) | where err.code == 'ETIMEDOUT
 ax "['wsh-logs'] | where message contains 'cleanup' | extend ctx = parse_json(context) | where ctx.agentId == '2:1'" --project '*cli-tt*'
 ```
 
-Flags merge with APL: `--project`, `--level`, `--start-time`, `--limit` are appended to your APL query automatically.
+Flags merge with APL: `--project`, `--level`, `--start-time`, `--end-time`, `--limit` are appended to your APL query automatically.
 
 **Glob patterns:** Use `*foo*` (contains) - most useful since logger names have org prefix (e.g., `mdr:cli-tt`). Also supports `foo*` (startswith), `*foo` (endswith).
 
@@ -1352,7 +1352,7 @@ requiredFiles:
 - @src/logger.ts (800)
 
 ## requiredSkills (9k)
-- [@../edit-skill/SKILL.md (3k)](https://hackmd.io/DcMwu0jNRuWOyQtrOVax-w)
+- [@../edit-skill/SKILL.md (3k)](https://hackmd.io/arh_StRpSZu_IqtLyyJipQ)
 - @../lib-1password/SKILL.md (2k)
 - [@../lib-log/SKILL.md (3k)](https://hackmd.io/qX8wO9lCQ8m1e3NPBeEitg)
   - @../lib-log/README.md (1k)
@@ -1487,13 +1487,13 @@ Utilities that enhance development but gracefully degrade in CI environments.
 | `@mdr/lib-utils/browser` | lib-log | Axiom logging | Console stub | Console stub |
 
 ## TABLE OF CONTENTS
-1. Installation
-2. Logging
+- Installation
+- Logging
   - lib-log / logger.ts - createLogger(project-name)
   - Browser - createLogger(project-name)
   - Querying Logs: `ax` CLI
-3. lib-1password / env.ts - initEnv(projectRoot, skipIfEnvVars?, log?)
-4. Scripts
+- lib-1password / env.ts - initEnv(projectRoot, skipIfEnvVars?, log?)
+- Scripts
 
 ## Installation
 
@@ -1565,7 +1565,7 @@ await log.flush();
 
 **Don't log** high-volume operations at info level (>45/min: e.g. polling loops).
 
-**CLI log level: default to info.** The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `debug` via `overmind.env`. All levels still ship to Axiom. Override with `LOG_LEVEL=debug mycli ...`.
+The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `LOG_LEVEL=debug` via `overmind.env`. All levels still ship to Axiom.
 
 ### Browser - createLogger(project-name)
 
@@ -1598,6 +1598,8 @@ ax --json                   # JSON output for agents
 **Glob patterns:** Use `*foo*` (contains) - most useful since logger names have org prefix (e.g., `mdr:cli-tt`).
 
 **Filtering by metadata:** Use APL passthrough for field filtering (`ax "['wsh-logs'] | extend ctx = parse_json(context) | where ctx.field == 'value'" --project '*foo*'`). Do NOT use `--json | python3` - APL is faster and wastes less context.
+
+**Debugging:** When investigating issues, query `ax` while reading source code (spawn a subagent for one while you do the other). Load `$mdr:dev-debug` for the full Axiom-first debugging workflow.
 
 See `$mdr:lib-log` for full ax documentation including APL passthrough.
 

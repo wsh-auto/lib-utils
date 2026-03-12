@@ -15,13 +15,13 @@ Utilities that enhance development but gracefully degrade in CI environments.
 | `@mdr/lib-utils/browser` | lib-log | Axiom logging | Console stub | Console stub |
 
 ## TABLE OF CONTENTS
-1. Installation
-2. Logging
+- Installation
+- Logging
   - lib-log / logger.ts - createLogger(project-name)
   - Browser - createLogger(project-name)
   - Querying Logs: `ax` CLI
-3. lib-1password / env.ts - initEnv(projectRoot, skipIfEnvVars?, log?)
-4. Scripts
+- lib-1password / env.ts - initEnv(projectRoot, skipIfEnvVars?, log?)
+- Scripts
 
 ## Installation
 
@@ -93,7 +93,7 @@ await log.flush();
 
 **Don't log** high-volume operations at info level (>45/min: e.g. polling loops).
 
-The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `LOG_LEVL=debug` via `overmind.env`. All levels still ship to Axiom.
+The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `LOG_LEVEL=debug` via `overmind.env`. All levels still ship to Axiom.
 
 ### Browser - createLogger(project-name)
 
@@ -126,6 +126,8 @@ ax --json                   # JSON output for agents
 **Glob patterns:** Use `*foo*` (contains) - most useful since logger names have org prefix (e.g., `mdr:cli-tt`).
 
 **Filtering by metadata:** Use APL passthrough for field filtering (`ax "['wsh-logs'] | extend ctx = parse_json(context) | where ctx.field == 'value'" --project '*foo*'`). Do NOT use `--json | python3` - APL is faster and wastes less context.
+
+**Debugging:** When investigating issues, query `ax` while reading source code (spawn a subagent for one while you do the other). Load `$mdr:dev-debug` for the full Axiom-first debugging workflow.
 
 See `$mdr:lib-log` for full ax documentation including APL passthrough.
 
