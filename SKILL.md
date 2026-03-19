@@ -78,6 +78,8 @@ await log.flush();
 
 **Output destinations:** With lib-log, logs go to both stderr and Axiom (cloud persistence). Runtime logs may hide debug-level entries, so validate with Axiom queries (`ax`) instead of relying only on service logs.
 
+**Querying Axiom from TypeScript:** Use `query()` from `@mdr/lib-log`, not `exec('ax', ...)`. See `$lib-log` SKILL.md for the env isolation failure mode.
+
 **CLI logging policy:**
 - `stdout` - composable data only (JSON, IDs, paths, tables). Must contain nothing that wouldn't make sense piped to another program. Banned: `console.log` for progress/status messages.
 - `stderr` - everything useful for debugging later (state, status, progress, decisions, errors). MUST go through lib-log (`log.info`/`log.debug`/etc.), never via raw `console.error`. `log.*()` already writes to stderr via `StderrTransport` and also ships to Axiom, so `console.error` double-prints locally while bypassing structured logging and cloud persistence. For CLI catch blocks, use `log.warn()` for handled exits and `log.error()` for bug paths; see `$mdr:dev-core` for the single-exit pattern.

@@ -11,7 +11,7 @@ requiredFiles:
 
 # lib-utils (14.4k)
 ## Documentation (2.8k)
-- [@SKILL.md (1.9k)](https://hackmd.io/gFtXBvMiQZ65Rfog7WmV-w)
+- [@SKILL.md (2k)](https://hackmd.io/gFtXBvMiQZ65Rfog7WmV-w)
 - @CONTRIBUTING.md (600)
 - @package.json (300)
 
@@ -23,5 +23,5 @@ requiredFiles:
 ## requiredSkills (9k)
 - [@../edit-skill/SKILL.md (3k)](https://hackmd.io/arh_StRpSZu_IqtLyyJipQ)
 - @../lib-1password/SKILL.md (2k)
-- [@../lib-log/SKILL.md (3k)](https://hackmd.io/qX8wO9lCQ8m1e3NPBeEitg)
+- [@../lib-log/SKILL.md (3k)](https://hackmd.io/3_5-E1orTYONVf1lhnrCFQ)
   - @../lib-log/README.md (1k)

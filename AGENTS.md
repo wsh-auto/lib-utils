@@ -47,7 +47,7 @@ User Provided Header
 <!-- User Provided Header -->
 AGENTS context for lib-utils
 
-PRIMARY: SKILL.md (1.9k) - How to use; self-contained
+PRIMARY: SKILL.md (2k) - How to use; self-contained
 
 ## Other Documentation
 - @CONTRIBUTING.md (600) - How to develop/maintain
@@ -126,12 +126,12 @@ hackmd: https://hackmd.io/arh_StRpSZu_IqtLyyJipQ
   - references/
   - assets/
 - Process for Editing Skills
-  - Understanding Existing Structure
-  - Making Effective Edits
-  - Generate CLAUDE.md
-  - Validation Workflow
-  - Testing Script Changes
-  - Audit with `$mdr:audit-skill`
+  - 1. Understanding Existing Structure
+  - 2. Making Effective Edits
+  - 3. Generate CLAUDE.md
+  - 4. Validation Workflow
+  - 5. Testing Script Changes
+  - 6. Audit with `$mdr:audit-skill`
 - $edit-skill Scripts
   - ccsync
 
@@ -174,7 +174,7 @@ All skills must follow the naming conventions in ../CONTRIBUTING.md. Key prefixe
 - **persona-***: Professional role expertise (e.g., persona-architect, persona-test-engineer)
 - **edit-***: Create/edit specific file types (e.g., edit-skill, edit-claude-subagent)
 - **task-***: Conversational output workflows (e.g., task-classify-conversation)
-- **workflow-***: Multi-step file creation workflows (e.g., workflow-project)
+- **wf-***: Workflow phase skills (e.g., wf-plan, wf-implement, wf-validate)
 - **query-***: External service/API interaction (e.g., query-airtable, query-hackmd)
 - **help-***: Operational guides for third-party CLI tools (e.g., help-claude, help-codex, help-gemini)
 - **cli-***: Our own CLI tools with source code (e.g., cli-mdr, cli-repomix, cli-tt, cli-bash)
@@ -637,7 +637,7 @@ All TypeScript projects migrated to import from `@mdr/lib-utils` on 2026-01-16.
 | Project | Grade | Logger Names |
 |---------|:-----:|--------------|
 | frontend | B | wsh:frontend |
-| srv-plans | B | wsh:srv-plans, :sling, :state, :watch, :ws |
+| srv-board | B | wsh:srv-board, :sling, :state, :watch, :ws |
 | srv-wsh | F | wsh:srv-wsh, :detector, :master, :pool, :router, :telegram |
 
 ### Python
@@ -681,7 +681,7 @@ description: >-
   to any project or querying logs with the ax CLI.
 requiredFiles:
   - README.md
-hackmd: https://hackmd.io/qX8wO9lCQ8m1e3NPBeEitg
+hackmd: https://hackmd.io/3_5-E1orTYONVf1lhnrCFQ
 ---
 # lib-log
 
@@ -694,6 +694,7 @@ Centralized logging using Axiom (1TB/month free). See @README.md for list of use
 - Frontend (Browser)
 - CLI: `ax`
   - Filtering by Metadata Fields: Use APL Passthrough; Banned: `--json | python3`
+  - Banned: Spawning `ax` as Subprocess from TypeScript; Use `query()` Library Import
 - Configuration
   - Tokens (1Password: `wsh/skills_lib-log`)
   - Other Variables
@@ -778,7 +779,7 @@ log.info('Page loaded');
 log.error('API call failed', { status: 500 });
 ```
 
-Token read from `window.__WSH_CONFIG__.axiomToken` (injected by srv-plans).
+Token read from `window.__WSH_CONFIG__.axiomToken` (injected by srv-board).
 
 **Security:** Frontend uses ingest-only token (`AXIOM_TOKEN_FRONTEND`). If leaked, attacker can only write logs, not read them.
 
@@ -834,6 +835,9 @@ Flags merge with APL: `--project`, `--level`, `--start-time`, `--end-time`, `--l
 **Output order:** Chronological (oldest first, newest last) for both human and `--json` output.
 
 Run `ax --help` for full usage.
+
+### Banned: Spawning `ax` as Subprocess from TypeScript; Use `query()` Library Import
+`ax` runs its own `initEnv` to load the Axiom query token. When another TypeScript process spawns `ax` as a child via `exec`/`spawn`, the child's `initEnv` runs in a separate process with a separate `.env` resolution path. If the parent's `initEnv` loaded a different project's secrets, the child silently gets no query token and returns `[]` instead of erroring. Use the `query()` export from `@mdr/lib-log` instead - same process, same Axiom client, no env isolation issues.
 
 ## Configuration
 
@@ -1342,7 +1346,7 @@ requiredFiles:
 
 # lib-utils (14.4k)
 ## Documentation (2.8k)
-- [@SKILL.md (1.9k)](https://hackmd.io/gFtXBvMiQZ65Rfog7WmV-w)
+- [@SKILL.md (2k)](https://hackmd.io/gFtXBvMiQZ65Rfog7WmV-w)
 - @CONTRIBUTING.md (600)
 - @package.json (300)
 
@@ -1354,7 +1358,7 @@ requiredFiles:
 ## requiredSkills (9k)
 - [@../edit-skill/SKILL.md (3k)](https://hackmd.io/arh_StRpSZu_IqtLyyJipQ)
 - @../lib-1password/SKILL.md (2k)
-- [@../lib-log/SKILL.md (3k)](https://hackmd.io/qX8wO9lCQ8m1e3NPBeEitg)
+- [@../lib-log/SKILL.md (3k)](https://hackmd.io/3_5-E1orTYONVf1lhnrCFQ)
   - @../lib-log/README.md (1k)
 
 ================
@@ -1549,6 +1553,8 @@ await log.flush();
 **Test teardown:** Call `await shutdown()` (not `flush()`) to close the Axiom client and allow vitest to exit cleanly.
 
 **Output destinations:** With lib-log, logs go to both stderr and Axiom (cloud persistence). Runtime logs may hide debug-level entries, so validate with Axiom queries (`ax`) instead of relying only on service logs.
+
+**Querying Axiom from TypeScript:** Use `query()` from `@mdr/lib-log`, not `exec('ax', ...)`. See `$lib-log` SKILL.md for the env isolation failure mode.
 
 **CLI logging policy:**
 - `stdout` - composable data only (JSON, IDs, paths, tables). Must contain nothing that wouldn't make sense piped to another program. Banned: `console.log` for progress/status messages.
