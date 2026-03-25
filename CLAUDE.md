@@ -21,7 +21,7 @@ requiredFiles:
 - @src/logger.ts (800)
 
 ## requiredSkills (9k)
-- [@../edit-skill/SKILL.md (3k)](https://hackmd.io/arh_StRpSZu_IqtLyyJipQ)
+- [@../edit-skill/SKILL.md (3k)](https://hackmd.io/-bVZsqTCQP2G6iYmchkYcA)
 - @../lib-1password/SKILL.md (2k)
 - [@../lib-log/SKILL.md (3k)](https://hackmd.io/3_5-E1orTYONVf1lhnrCFQ)
   - @../lib-log/README.md (1k)

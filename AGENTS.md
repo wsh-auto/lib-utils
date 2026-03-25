@@ -105,7 +105,7 @@ name: edit-skill
 description: >-
   Guide for editing and creating Skills. This skill should be used when users want to edit an existing Skill or create a new Skill that extends agentic capabilities with specialized knowledge, workflows, or tool integrations.
 source: ~/mnt/data/mirrors/openai/skills/skills/.system/skill-creator/
-hackmd: https://hackmd.io/arh_StRpSZu_IqtLyyJipQ
+hackmd: https://hackmd.io/-bVZsqTCQP2G6iYmchkYcA
 ---
 # Skill Editor and Builder
 
@@ -121,6 +121,7 @@ hackmd: https://hackmd.io/arh_StRpSZu_IqtLyyJipQ
 - YAML Metadata
   - name: and description:
   - host:
+  - disable-model-invocation:
 - Bundled Resources Details
   - scripts/
   - references/
@@ -226,6 +227,9 @@ const currentHost = hostname().split('.')[0]; // m3.local → m3
 if (currentHost !== TARGET_HOST) { /* SSH or throw */ }
 ```
 - Common bug: `os.hostname()` returns FQDN (`m3.local`), always split on `.` and take `[0]`.
+
+### disable-model-invocation:
+Prevents Claude from proactively invoking a skill. This field exists in Claude Code but is not currently needed because `SLASH_COMMAND_TOOL_CHAR_BUDGET=0` globally suppresses per-turn catalog injection, achieving the same effect. If the budget setting is restored in future, `disable-model-invocation: true` can be used per-skill to hide it from model-initiated invocation while keeping it available via explicit `/skill-name`.
 
 ## Bundled Resources Details
 ### scripts/
@@ -1356,7 +1360,7 @@ requiredFiles:
 - @src/logger.ts (800)
 
 ## requiredSkills (9k)
-- [@../edit-skill/SKILL.md (3k)](https://hackmd.io/arh_StRpSZu_IqtLyyJipQ)
+- [@../edit-skill/SKILL.md (3k)](https://hackmd.io/-bVZsqTCQP2G6iYmchkYcA)
 - @../lib-1password/SKILL.md (2k)
 - [@../lib-log/SKILL.md (3k)](https://hackmd.io/3_5-E1orTYONVf1lhnrCFQ)
   - @../lib-log/README.md (1k)
