@@ -229,7 +229,7 @@ if (currentHost !== TARGET_HOST) { /* SSH or throw */ }
 - Common bug: `os.hostname()` returns FQDN (`m3.local`), always split on `.` and take `[0]`.
 
 ### disable-model-invocation:
-Prevents Claude from proactively invoking a skill. This field exists in Claude Code but is not currently needed because `SLASH_COMMAND_TOOL_CHAR_BUDGET=0` globally suppresses per-turn catalog injection, achieving the same effect. If the budget setting is restored in future, `disable-model-invocation: true` can be used per-skill to hide it from model-initiated invocation while keeping it available via explicit `/skill-name`.
+Prevents Claude from proactively invoking a skill. This field exists in Claude Code but is not currently needed because `SLASH_COMMAND_TOOL_CHAR_BUDGET=1` truncates per-turn catalog to names-only (~3KB vs ~60KB), achieving a similar effect. If the budget setting is removed in future, `disable-model-invocation: true` can be used per-skill to hide it from model-initiated invocation while keeping it available via explicit `/skill-name`.
 
 ## Bundled Resources Details
 ### scripts/
@@ -283,7 +283,9 @@ For documentation style rules (DRY, structure, succinctness), see `$interface-sy
 3. How should Claude use the skill? Reference all reusable contents.
 
 ### 3. Generate CLAUDE.md
-Use `rp init` to generate CLAUDE.md then use `rp add` to edit its `requiredSkills` and `requiredFiles`. 
+Use `rp init` to generate CLAUDE.md then use `rp add` to edit its `requiredSkills` and `requiredFiles`.
+
+**Bidirectional requiredSkills rule:** If skill A imports skill B (TS `package.json` dependency), both must list each other in `requiredSkills`. A needs B's API docs; B needs to know its consumers. Claude Code handles circular resolution.
 
 See `$cli-repomix` for more details.
 
