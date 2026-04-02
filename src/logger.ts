@@ -76,11 +76,16 @@ export function createLogger(name: string): Logger {
 }
 
 /**
- * Flush all pending logs and reset the shared Axiom client.
- * Call in test teardown to allow clean process exit.
+ * Flush all pending logs, drain stdout, and reset the shared Axiom client.
+ * Call before process.exit() to ensure piped stdout is fully written.
+ * Bun's process.exit() does not wait for pending stdout writes; without
+ * this drain, large piped output (>64KB) gets silently truncated.
  */
 export async function shutdown(): Promise<void> {
   if (libLog.shutdown) {
     await libLog.shutdown();
+  }
+  if (!process.stdout.writableEnded) {
+    await new Promise<void>(resolve => process.stdout.write('', () => resolve()));
   }
 }

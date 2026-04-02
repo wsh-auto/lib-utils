@@ -36,6 +36,7 @@
     "check": "bun run typecheck",
     "lint": "eslint '{src,test}/**/*.ts'",
     "lint:fix": "eslint '{src,test}/**/*.ts' --fix",
+    "test": "bun run lint && bun run typecheck && timeout --foreground 300 vitest run test/unit",
     "with-lock:install": "with-lock --project-root . -- bun install",
     "preinstall": "with-lock preinstall-guard @mdr/lib-utils"
   },
@@ -46,6 +47,7 @@
     "dotenv": "^17.2.3",
     "eslint": "8.57.0",
     "typescript": "5.4.5",
-    "typescript-eslint": "7.11.0"
+    "typescript-eslint": "7.11.0",
+    "vitest": "1.6.0"
   }
 }

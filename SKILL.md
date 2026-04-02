@@ -68,7 +68,7 @@ await log.flush();
 - If not + CI: console-based stub (debug/info/warn/error all log)
 - If not + not CI: exit(1) with instructions to add to optionalDependencies
 
-**CLI commands must `await shutdown()`** before exit - flushes pending logs and releases the Axiom handle. Long-running daemons don't need `shutdown()`. lib-log's `shutdown()` has a 5s safety timeout so callers don't need to add their own.
+**CLI commands must `await shutdown()`** before exit - flushes pending logs, drains stdout (prevents Bun's `process.exit()` from truncating piped output >64KB), and releases the Axiom handle. Long-running daemons don't need `shutdown()`. lib-log's `shutdown()` has a 5s safety timeout so callers don't need to add their own.
 
 **`flush()` vs `shutdown()`:** `flush()` sends pending logs but keeps the Axiom handle open (useful mid-process). `shutdown()` flushes + sets the shared client to `undefined`, releasing the handle.
 

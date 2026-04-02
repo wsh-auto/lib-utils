@@ -1327,12 +1327,17 @@ export function createLogger(name: string): Logger {
 }
 
 /**
- * Flush all pending logs and reset the shared Axiom client.
- * Call in test teardown to allow clean process exit.
+ * Flush all pending logs, drain stdout, and reset the shared Axiom client.
+ * Call before process.exit() to ensure piped stdout is fully written.
+ * Bun's process.exit() does not wait for pending stdout writes; without
+ * this drain, large piped output (>64KB) gets silently truncated.
  */
 export async function shutdown(): Promise<void> {
   if (libLog.shutdown) {
     await libLog.shutdown();
+  }
+  if (!process.stdout.writableEnded) {
+    await new Promise<void>(resolve => process.stdout.write('', () => resolve()));
   }
 }
 
@@ -1350,16 +1355,16 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (14.4k)
-## Documentation (2.8k)
+# lib-utils (14.6k)
+## Documentation (2.9k)
 - [@SKILL.md (2k)](https://hackmd.io/gFtXBvMiQZ65Rfog7WmV-w)
 - @CONTRIBUTING.md (600)
 - @package.json (300)
 
-## Code (2.6k)
+## Code (2.7k)
 - @scripts/_LIB-UTILS_update-dependents (1.2k)
 - @src/env.ts (600)
-- @src/logger.ts (800)
+- @src/logger.ts (900)
 
 ## requiredSkills (9k)
 - [@../edit-skill/SKILL.md (3k)](https://hackmd.io/-bVZsqTCQP2G6iYmchkYcA)
@@ -1463,6 +1468,7 @@ File: lib-utils/package.json
     "check": "bun run typecheck",
     "lint": "eslint '{src,test}/**/*.ts'",
     "lint:fix": "eslint '{src,test}/**/*.ts' --fix",
+    "test": "bun run lint && bun run typecheck && timeout --foreground 300 vitest run test/unit",
     "with-lock:install": "with-lock --project-root . -- bun install",
     "preinstall": "with-lock preinstall-guard @mdr/lib-utils"
   },
@@ -1473,7 +1479,8 @@ File: lib-utils/package.json
     "dotenv": "^17.2.3",
     "eslint": "8.57.0",
     "typescript": "5.4.5",
-    "typescript-eslint": "7.11.0"
+    "typescript-eslint": "7.11.0",
+    "vitest": "1.6.0"
   }
 }
 
@@ -1550,7 +1557,7 @@ await log.flush();
 - If not + CI: console-based stub (debug/info/warn/error all log)
 - If not + not CI: exit(1) with instructions to add to optionalDependencies
 
-**CLI commands must `await shutdown()`** before exit - flushes pending logs and releases the Axiom handle. Long-running daemons don't need `shutdown()`. lib-log's `shutdown()` has a 5s safety timeout so callers don't need to add their own.
+**CLI commands must `await shutdown()`** before exit - flushes pending logs, drains stdout (prevents Bun's `process.exit()` from truncating piped output >64KB), and releases the Axiom handle. Long-running daemons don't need `shutdown()`. lib-log's `shutdown()` has a 5s safety timeout so callers don't need to add their own.
 
 **`flush()` vs `shutdown()`:** `flush()` sends pending logs but keeps the Axiom handle open (useful mid-process). `shutdown()` flushes + sets the shared client to `undefined`, releasing the handle.
 
