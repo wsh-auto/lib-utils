@@ -11,7 +11,7 @@ PRIMARY: SKILL.md (2.3k) - How to use; self-contained
 
 ## Other Documentation
 - @CONTRIBUTING.md (600) - How to develop/maintain
-- @package.json (400) - Dependencies, scripts, project metadata
+- @package.json (500) - Dependencies, scripts, project metadata
 
 All other files below are supporting context from dependencies.
 
@@ -2434,8 +2434,8 @@ try {
     console.error(
       `[lib-utils] FATAL: lib-1password not available.\n` +
         `Add to optionalDependencies:\n` +
-        `  "@mdr/lib-1password": "file:../lib-1password"\n` +
-        `Then run: bun install\n` +
+        `  "@mdr/lib-1password": "link:@mdr/lib-1password"\n` +
+        `Then run: bun link @mdr/lib-1password && bun install\n` +
         `(caller: ${caller})`
     );
     process.exit(1);
@@ -2575,7 +2575,7 @@ requiredFiles:
 ## Documentation (3.3k)
 - [@SKILL.md (2.3k)](https://hackmd.io/97moevI4QN6d_6Rs3IxALg)
 - @CONTRIBUTING.md (600)
-- @package.json (400)
+- @package.json (500)
 
 ## Code (2.8k)
 - @scripts/_LIB-UTILS_update-dependents (1.2k)
@@ -2651,13 +2651,13 @@ File: lib-utils/package.json
 ================
 {
   "name": "@mdr/lib-utils",
-  "version": "1.0.1",
+  "version": "1.5.2",
   "type": "module",
   "packageManager": "bun@1.3.11",
   "typesVersions": {
     "*": {
-      "vitest-reporters": [
-        "dist/vitest-reporters.d.ts"
+      "helpers": [
+        "dist/helpers.d.ts"
       ],
       "logger": [
         "dist/logger.d.ts"
@@ -2671,9 +2671,9 @@ File: lib-utils/package.json
     }
   },
   "exports": {
-    "./vitest-reporters": {
-      "types": "./dist/vitest-reporters.d.ts",
-      "default": "./src/vitest-reporters.ts"
+    "./helpers": {
+      "types": "./dist/helpers.d.ts",
+      "default": "./src/helpers.js"
     },
     "./logger": {
       "types": "./dist/logger.d.ts",
@@ -2691,6 +2691,10 @@ File: lib-utils/package.json
   "dependencies": {
     "@mdr/lib-helpers": "link:@mdr/lib-helpers"
   },
+  "optionalDependencies": {
+    "@mdr/lib-log": "link:@mdr/lib-log",
+    "@mdr/lib-1password": "link:@mdr/lib-1password"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.check.json",
@@ -2698,7 +2702,7 @@ File: lib-utils/package.json
     "lint": "eslint '{src,test}/**/*.ts'",
     "lint:fix": "eslint '{src,test}/**/*.ts' --fix",
     "test": "bun run lint && bun run typecheck && bun run test:unit",
-    "test:unit": "dt run -- timeout --foreground 300 vitest run test/unit",
+    "test:unit": "dt wrap -- timeout --foreground 300 ./node_modules/.bin/vitest run test/unit",
     "with-lock:install": "with-lock --project-root . -- bun install",
     "preinstall": "with-lock preinstall-guard @mdr/lib-utils"
   },
@@ -2770,8 +2774,8 @@ export MY_API_KEY=op://wsh/skills_my-project/API_KEY
 ```
 Add `.env` to `.gitignore` - it's generated with real values at runtime.
 
-## Logging
-### lib-log / logger.ts - createLogger(project-name)
+## lib-log / Logging
+### logger.ts - createLogger(project-name)
 
 ```typescript
 import { createLogger } from '@mdr/lib-utils/logger';

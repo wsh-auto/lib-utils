@@ -14,7 +14,7 @@ requiredFiles:
 ## Documentation (3.3k)
 - [@SKILL.md (2.3k)](https://hackmd.io/97moevI4QN6d_6Rs3IxALg)
 - @CONTRIBUTING.md (600)
-- @package.json (400)
+- @package.json (500)
 
 ## Code (2.8k)
 - @scripts/_LIB-UTILS_update-dependents (1.2k)

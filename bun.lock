@@ -18,6 +18,7 @@
         "vitest": "3.2.4",
       },
       "optionalDependencies": {
+        "@mdr/lib-1password": "link:@mdr/lib-1password",
         "@mdr/lib-log": "link:@mdr/lib-log",
       },
     },
@@ -86,6 +87,8 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
     "@mdr/dev-typescript": ["@mdr/dev-typescript@link:@mdr/dev-typescript", {}],
+
+    "@mdr/lib-1password": ["@mdr/lib-1password@link:@mdr/lib-1password", {}],
 
     "@mdr/lib-helpers": ["@mdr/lib-helpers@link:@mdr/lib-helpers", {}],
 
