@@ -40,6 +40,10 @@
   "dependencies": {
     "@mdr/lib-helpers": "link:@mdr/lib-helpers"
   },
+  "optionalDependencies": {
+    "@mdr/lib-log": "link:@mdr/lib-log",
+    "@mdr/lib-1password": "link:@mdr/lib-1password"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.check.json",

@@ -17,6 +17,9 @@
         "typescript-eslint": "7.11.0",
         "vitest": "3.2.4",
       },
+      "optionalDependencies": {
+        "@mdr/lib-log": "link:@mdr/lib-log",
+      },
     },
   },
   "packages": {
@@ -85,6 +88,8 @@
     "@mdr/dev-typescript": ["@mdr/dev-typescript@link:@mdr/dev-typescript", {}],
 
     "@mdr/lib-helpers": ["@mdr/lib-helpers@link:@mdr/lib-helpers", {}],
+
+    "@mdr/lib-log": ["@mdr/lib-log@link:@mdr/lib-log", {}],
 
     "@nodelib/fs.scandir": ["@nodelib/fs.scandir@2.1.5", "", { "dependencies": { "@nodelib/fs.stat": "2.0.5", "run-parallel": "^1.1.9" } }, "sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g=="],
 

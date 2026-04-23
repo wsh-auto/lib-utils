@@ -51,8 +51,8 @@ export MY_API_KEY=op://wsh/skills_my-project/API_KEY
 ```
 Add `.env` to `.gitignore` - it's generated with real values at runtime.
 
-## Logging
-### lib-log / logger.ts - createLogger(project-name)
+## lib-log / Logging
+### logger.ts - createLogger(project-name)
 
 ```typescript
 import { createLogger } from '@mdr/lib-utils/logger';
