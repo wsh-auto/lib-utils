@@ -1,9 +1,9 @@
 /**
  * Browser-compatible logger wrapper for lib-log.
  *
- * lib-log is an optional dependency that provides Axiom cloud logging.
+ * lib-log is an optional dependency, but the browser runtime is still console-only today.
  * This wrapper provides graceful degradation for browsers:
- * - With lib-log: full Axiom logging (lib-log handles browser token via __WSH_CONFIG__)
+ * - With lib-log: console-only browser logger (browser -> Axiom is not implemented yet)
  * - Without lib-log: console-only fallback (CI environments)
  *
  * Unlike the Node logger.ts, this module:
@@ -13,10 +13,13 @@
  */
 
 interface Logger {
+  critical(message: string, fields?: Record<string, unknown>): void;
   debug(message: string, fields?: Record<string, unknown>): void;
   info(message: string, fields?: Record<string, unknown>): void;
   warn(message: string, fields?: Record<string, unknown>): void;
   error(message: string, fields?: Record<string, unknown>): void;
+  telemetry(message: string, fields?: Record<string, unknown>): void;
+  trace(message: string, fields?: Record<string, unknown>): void;
   child(fields: Record<string, unknown>): Logger;
   flush(): Promise<void>;
 }
@@ -32,10 +35,13 @@ function _createStubLogger(name: string, parentFields: Record<string, unknown> =
   };
 
   return {
+    critical: (msg, fields) => console.error(format('critical', msg, fields)),
     debug: (msg, fields) => console.debug(format('debug', msg, fields)),
     info: (msg, fields) => console.info(format('info', msg, fields)),
     warn: (msg, fields) => console.warn(format('warn', msg, fields)),
     error: (msg, fields) => console.error(format('error', msg, fields)),
+    telemetry: () => {},
+    trace: (msg, fields) => console.debug(format('trace', msg, fields)),
     child: (fields) => _createStubLogger(name, { ...parentFields, ...fields }),
     flush: async () => {},
   };
@@ -70,10 +76,10 @@ _ensureInit();
 
 /**
  * Create a logger for browser environments.
- * Uses @mdr/lib-log if available (Axiom + console), otherwise console-only.
+ * Uses @mdr/lib-log if available (still console-only in the browser runtime), otherwise console-only.
  *
  * @param name - Logger name (appears in log output, e.g., 'wsh:frontend')
- * @returns Logger instance with debug/info/warn/error/child/flush methods
+ * @returns Logger instance with critical/debug/info/warn/error/telemetry/trace/child/flush methods
  */
 export function createLogger(name: string): Logger {
   // If lib-log loaded, use it. Otherwise use stub (init still pending or failed).

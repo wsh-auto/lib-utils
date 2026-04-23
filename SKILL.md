@@ -2,7 +2,7 @@
 name: lib-utils
 description: >-
   CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup.
-hackmd: https://hackmd.io/gFtXBvMiQZ65Rfog7WmV-w
+hackmd: https://hackmd.io/97moevI4QN6d_6Rs3IxALg
 ---
 # lib-utils
 
@@ -12,7 +12,7 @@ Utilities that enhance development but gracefully degrade in CI environments.
 |-------------|--------------|----------|------------------|----------------------|
 | `@mdr/lib-utils/logger` | lib-log | Axiom logging | Console stub | **exit(1)** |
 | `@mdr/lib-utils/env` | lib-1password | 1Password injection | No-op stub | **exit(1)** |
-| `@mdr/lib-utils/browser` | lib-log | Axiom logging | Console stub | Console stub |
+| `@mdr/lib-utils/browser` | lib-log | Console-only browser logger | Console stub | Console stub |
 
 ## TABLE OF CONTENTS
 - Installation
@@ -59,26 +59,35 @@ import { createLogger } from '@mdr/lib-utils/logger';
 
 const log = createLogger('my-project');
 
+log.critical('Build failed', { taskId: 'abc123' });
 log.info('Starting');
 log.error('Failed', { code: 500 });
+log.telemetry('Queue sample', { depth: 3 });
+log.trace('Polling tick');
 await log.flush();
 ```
 
-- If `@mdr/lib-log` installed: full Axiom logging
-- If not + CI: console-based stub (debug/info/warn/error all log)
+- If `@mdr/lib-log` installed: full Axiom logging (Winston-backed TypeScript; Python available via direct lib-log import)
+- If not + CI: console-based stub (`telemetry()` becomes a no-op; the other levels stay local)
 - If not + not CI: exit(1) with instructions to add to optionalDependencies
 
-**CLI commands must `await shutdown()`** before exit - flushes pending logs, drains stdout (prevents Bun's `process.exit()` from truncating piped output >64KB), and releases the Axiom handle. Long-running daemons don't need `shutdown()`. lib-log's `shutdown()` has a 5s safety timeout so callers don't need to add their own.
+**TypeScript levels:** `critical` (stderr+Axiom+Telegram escalation), `error`/`warn`/`info`/`debug` (stderr+Axiom), `telemetry` (Axiom-only), `trace` (stderr-only). Python stays on `debug`/`info`/`warn`/`error`.
 
-**`flush()` vs `shutdown()`:** `flush()` sends pending logs but keeps the Axiom handle open (useful mid-process). `shutdown()` flushes + sets the shared client to `undefined`, releasing the handle.
-
-**Shared client:** All loggers share one Axiom client. One `shutdown()` call drains and closes all loggers in the process.
-
-**Test teardown:** Call `await shutdown()` (not `flush()`) to close the Axiom client and allow vitest to exit cleanly.
+**CLI commands must `await shutdown()`** before exit - flushes pending logs, drains stdout (prevents Bun's `process.exit()` from truncating piped output >64KB), and releases the Axiom handle. Long-running daemons don't need `shutdown()`. `flush()` sends pending writes but keeps transports alive; `shutdown()` also resets the registry. One `flush()`/`shutdown()` drains every logger in the process. 5s safety timeout.
 
 **Output destinations:** With lib-log, logs go to both stderr and Axiom (cloud persistence). Runtime logs may hide debug-level entries, so validate with Axiom queries (`ax`) instead of relying only on service logs.
 
 **Querying Axiom from TypeScript:** Use `query()` from `@mdr/lib-log`, not `exec('ax', ...)`. See `$lib-log` SKILL.md for the env isolation failure mode.
+
+**See `$mdr:lib-log` for:**
+- Python usage (`from lib_log import create_logger`)
+- CRITICAL escalation (Telegram routing via `chat-telegram`, 5min default cooldown)
+- Axiom schema (8 columns: `_time`, `level`, `message`, `project`, `env`, `hostname`, `context`, `error`)
+- Token auto-load from `~/mnt/mdr/skills/lib-log/.env`; 3-token least-privilege split (ingest / frontend / query)
+- Logger naming: `{org}:{project}[:{subsystem}]` - name must match code location
+- Error objects: pass directly (any key name) → auto-serialized to `error` column with `name`/`message`/`stack`/`code`/`cause`
+- Large values: no write-time truncation, but keep under ~100KB/10s; `ax` read-time truncates to 200 chars (`ax --full` to override)
+- Runtime defaults in `assets/config.yml` (cooldown, flush timeout, dataset, console level)
 
 **CLI logging policy:**
 - `stdout` - composable data only (JSON, IDs, paths, tables). Must contain nothing that wouldn't make sense piped to another program. Banned: `console.log` for progress/status messages.
@@ -94,6 +103,8 @@ await log.flush();
 - `log.debug()` - SHOULD log: internal function calls useful for debugging (on by default, suppress with `LOG_LEVEL=info`)
 
 **Don't log** high-volume operations at info level (>45/min: e.g. polling loops).
+
+**Log messages should be single-line.** No `\n` in log strings. Use the structured context object for multi-field data instead of formatting a multi-line string. Multi-line log messages break `ax` queries, `grep`, and Axiom dashboard rendering.
 
 The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `LOG_LEVEL=debug` via `overmind.env`. All levels still ship to Axiom.
 
@@ -112,6 +123,7 @@ log.info('Page loaded');
 - No Node.js APIs (works in browsers)
 - Never exits fatally - always graceful degradation
 - Uses lazy initialization (no top-level await for Vite compatibility)
+- Current runtime is console-only even when `lib-log` is available; browser -> Axiom shipping is planned, not implemented
 
 ### Querying Logs: `ax` CLI
 

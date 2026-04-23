@@ -57,7 +57,7 @@ describe('lib-utils wrappers', () => {
         logger.info('hello', { mode: 'ci' });
         await shutdown();
         console.log(JSON.stringify({
-          hasMethods: ['debug', 'info', 'warn', 'error', 'child', 'flush'].every((key) => typeof logger[key] === 'function')
+          hasMethods: ['critical', 'debug', 'info', 'warn', 'error', 'telemetry', 'trace', 'child', 'flush'].every((key) => typeof logger[key] === 'function')
         }));
       `,
       { CI: 'true' }

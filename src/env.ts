@@ -37,8 +37,8 @@ try {
     console.error(
       `[lib-utils] FATAL: lib-1password not available.\n` +
         `Add to optionalDependencies:\n` +
-        `  "@mdr/lib-1password": "file:../lib-1password"\n` +
-        `Then run: bun install\n` +
+        `  "@mdr/lib-1password": "link:@mdr/lib-1password"\n` +
+        `Then run: bun link @mdr/lib-1password && bun install\n` +
         `(caller: ${caller})`
     );
     process.exit(1);

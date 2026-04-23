@@ -8,10 +8,13 @@
  * - Missing dep outside CI: fatal error (forces proper setup)
  */
 interface Logger {
+    critical(message: string, fields?: Record<string, unknown>): void;
     debug(message: string, fields?: Record<string, unknown>): void;
     info(message: string, fields?: Record<string, unknown>): void;
     warn(message: string, fields?: Record<string, unknown>): void;
     error(message: string, fields?: Record<string, unknown>): void;
+    telemetry(message: string, fields?: Record<string, unknown>): void;
+    trace(message: string, fields?: Record<string, unknown>): void;
     child(fields: Record<string, unknown>): Logger;
     flush(): Promise<void>;
 }
@@ -20,12 +23,14 @@ interface Logger {
  * Safe to use in CI environments where lib-log may not be installed.
  *
  * @param name - Logger name (appears in log output)
- * @returns Logger instance with debug/info/warn/error/child/flush methods
+ * @returns Logger instance with critical/debug/info/warn/error/telemetry/trace/child/flush methods
  */
 export declare function createLogger(name: string): Logger;
 /**
- * Flush all pending logs and reset the shared Axiom client.
- * Call in test teardown to allow clean process exit.
+ * Flush all pending logs, drain stdout, and reset the shared Axiom transport registry.
+ * Call before process.exit() to ensure piped stdout is fully written.
+ * Bun's process.exit() does not wait for pending stdout writes; without
+ * this drain, large piped output (>64KB) gets silently truncated.
  */
 export declare function shutdown(): Promise<void>;
 export {};

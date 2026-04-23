@@ -9,10 +9,13 @@
  */
 
 interface Logger {
+  critical(message: string, fields?: Record<string, unknown>): void;
   debug(message: string, fields?: Record<string, unknown>): void;
   info(message: string, fields?: Record<string, unknown>): void;
   warn(message: string, fields?: Record<string, unknown>): void;
   error(message: string, fields?: Record<string, unknown>): void;
+  telemetry(message: string, fields?: Record<string, unknown>): void;
+  trace(message: string, fields?: Record<string, unknown>): void;
   child(fields: Record<string, unknown>): Logger;
   flush(): Promise<void>;
 }
@@ -29,10 +32,13 @@ function _createStubLogger(name: string, parentFields: Record<string, unknown> =
   };
 
   return {
+    critical: (msg, fields) => console.error(format('critical', msg, fields)),
     debug: (msg, fields) => console.log(format('debug', msg, fields)),
     info: (msg, fields) => console.log(format('info', msg, fields)),
     warn: (msg, fields) => console.warn(format('warn', msg, fields)),
     error: (msg, fields) => console.error(format('error', msg, fields)),
+    telemetry: () => {},
+    trace: (msg, fields) => console.debug(format('trace', msg, fields)),
     child: (fields) => _createStubLogger(name, { ...parentFields, ...fields }),
     flush: async () => {},
   };
@@ -56,8 +62,8 @@ try {
     console.error(
       `[lib-utils] FATAL: lib-log not available.\n` +
         `Add to optionalDependencies:\n` +
-        `  "@mdr/lib-log": "file:../lib-log"\n` +
-        `Then run: bun install\n` +
+        `  "@mdr/lib-log": "link:@mdr/lib-log"\n` +
+        `Then run: bun link @mdr/lib-log && bun install\n` +
         `(caller: ${caller})`
     );
     process.exit(1);
@@ -69,14 +75,14 @@ try {
  * Safe to use in CI environments where lib-log may not be installed.
  *
  * @param name - Logger name (appears in log output)
- * @returns Logger instance with debug/info/warn/error/child/flush methods
+ * @returns Logger instance with critical/debug/info/warn/error/telemetry/trace/child/flush methods
  */
 export function createLogger(name: string): Logger {
   return libLog.createLogger(name);
 }
 
 /**
- * Flush all pending logs, drain stdout, and reset the shared Axiom client.
+ * Flush all pending logs, drain stdout, and reset the shared Axiom transport registry.
  * Call before process.exit() to ensure piped stdout is fully written.
  * Bun's process.exit() does not wait for pending stdout writes; without
  * this drain, large piped output (>64KB) gets silently truncated.
