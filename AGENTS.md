@@ -2245,7 +2245,7 @@ ${CYAN}USAGE${NC}
 
 ${CYAN}DESCRIPTION${NC}
     Scans ~/mnt for all package.json files containing @mdr/lib-utils,
-    removes their bun.lockb to clear pinned commits, and runs bun install
+    removes their Bun lockfiles to clear pinned commits, and runs bun install
     to fetch the latest version from GitHub. Runs in parallel (8 jobs).
 
     ${DIM}Handles monorepo workspaces: if a package is inside a workspace,
@@ -2336,7 +2336,7 @@ update_project() {
   local short_path="${dir/#$HOME/\~}"
 
   cd "$dir" || { printf "  \x1b[31m✗\x1b[0m %s \x1b[2mcd failed\x1b[0m\n" "$short_path"; return 1; }
-  rm -f bun.lockb
+  rm -f bun.lock bun.lockb
   if [[ "$CLEAN" == "true" ]]; then
     rm -rf node_modules
     # Also clean workspace subdirectory node_modules (monorepo support)
@@ -2348,7 +2348,7 @@ update_project() {
   fi
 
   local output exit_code
-  output=$(bun install 2>&1) && exit_code=0 || exit_code=$?
+  output=$(bun run with-lock:install 2>&1) && exit_code=0 || exit_code=$?
 
   if [[ $exit_code -eq 0 ]]; then
     local version
