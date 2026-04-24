@@ -101,6 +101,7 @@ Cross-language development patterns for TypeScript, Python, and Bash.
   - Argument Parsing Principles
   - --help Requirements
   - --json Support
+  - CLI Error Recovery Hints
   - Table Output: Use `cli-table3`/`rich`/`column -t`; Banned: Manual `padEnd`/`padStart`
   - Agent Context Detection
   - Single-Exit Pattern for CLIs with lib-utils/logger
@@ -317,6 +318,9 @@ Every script MUST support `--help` showing:
 Scripts returning information MUST support `--json`:
 - Human output, JSON output, and persisted status artifacts (files, frontmatter, logs) MUST render from one shared structured result. Parallel data models drift even when they begin "almost the same."
 - Pattern: `console.log(args.json ? JSON.stringify(result) : renderHuman(result))`
+
+### CLI Error Recovery Hints
+Common misuse or operational error paths should end with one literal recovery line: `Hint: <command>`. Explain the failure, then show the exact next retry the user or agent should run.
 
 ### Table Output: Use `cli-table3`/`rich`/`column -t`; Banned: Manual `padEnd`/`padStart`
 Use proper table libraries instead of manual `padEnd`/`padStart` formatting:
@@ -746,6 +750,8 @@ Projects use **Bun** to run TypeScript directly — no compilation step needed.
 - 1.8x faster cold start vs Node
 - Runs TypeScript directly (no build step)
 - Simpler wrapper scripts
+
+**Bun `process.exit()` pipe-truncation:** Bun does not drain stdout before exiting, so CLIs that `console.log` >64KB to a pipe get silently truncated by the reader. Always `await shutdown()` from `@mdr/lib-utils/logger` before `process.exit()`.
 
 ### Project Structure
 - `/src/` - TypeScript source (executed directly by Bun)
@@ -1831,7 +1837,7 @@ description: >-
   Centralized cloud logging for TypeScript and Python projects using Axiom. Provides dual output: colored console + JSON to Axiom. Use when adding logging to any project or querying logs with the ax CLI.
 requiredFiles:
   - README.md
-hackmd: https://hackmd.io/s5FaR0hVS6yNqHxg5y2W2A
+hackmd: https://hackmd.io/MEsItP9cS7yVldf73XkzBw
 ---
 # lib-log
 
@@ -1857,6 +1863,9 @@ Centralized logging using Axiom (1TB/month free). See @README.md for list of use
 - Error Logging
   - Surface the Real Error; Banned: Vague Class Descriptions in Log Messages
 - CRITICAL Escalation
+  - When to use `log.critical`
+  - What the auto-appended debug checklist contains
+  - Escalation failure visibility
 - Agent Guidelines
 
 ## Consumer Matrix
@@ -2205,9 +2214,46 @@ In catch blocks where the caught value isn't an `Error` instance (so auto-serial
 - resolves `projects.tg.topics.<shortcut>` through `@mdr/chat-telegram`
 - sends one Telegram notification to that mapped topic
 
-If the topic is missing, the package is unavailable, or the send fails, lib-log writes a structured `warn`/`error` entry with `reason` set to `missing-shortcut`, `chat-telegram-unavailable`, `cooldown`, or `send-failed`.
-
 Default cooldown is 5 minutes per logger project. Suppressed incidents still log to stderr and Axiom; only the Telegram side effect is skipped.
+
+### When to use `log.critical`
+Use `critical` only when all three hold; otherwise use `error`:
+1. **Won't self-heal** — the failure blocks work until a human/agent intervenes (daemon crash, start-up failure, shared infra fault). Retry-shaped errors are not critical.
+2. **User or data impact** — something downstream is broken, not just noisy.
+3. **Actionable from the payload alone** — a woken agent can start debugging from the Telegram message + the auto-appended debug checklist, without asking for more context.
+
+Convention fields (both optional, render as `"(not supplied)"` when absent):
+- `reproducer: string` — the one command that reproduces the failure (e.g. `pmm start ops-sysguard`).
+- `relevantFiles: string[]` — 2-4 files that describe the broken subsystem.
+
+```typescript
+log.critical('Daemon loop crashed', {
+  reproducer: 'pmm start ttd',
+  relevantFiles: ['src/daemon/loop.ts', 'src/daemon/pool.ts'],
+  error: err,
+});
+```
+
+### What the auto-appended debug checklist contains
+Every `critical` Telegram payload auto-appends:
+- **Process state** (crash-time snapshot, cannot be recovered after exit): pid, uptime, hostname, rssMb.
+- **Source** — `file:line` of the first non-lib-log frame (from the Error stack, or synthetic if no Error is supplied).
+- **Debug Checklist** — templated from `assets/config.yml` `critical.debugInstructions.*`:
+  - Reproducer + relevant files from the caller fields
+  - `ax` command pre-filled with this project and the default `--start-time` window
+  - Config-file path pointer
+  - `Load: $skill` lines from `docSkills` so the woken agent knows what to read first
+
+Operators can override per-logger via `createLogger(name, { critical: { debugInstructions: { axCommand, configPath, docSkills, startTime, maxBytes } } })`. When the rendered body exceeds `maxBytes` (default 3500), trailing `docSkills` entries are dropped first; reproducer/relevantFiles/ax/configPath always survive.
+
+### Escalation failure visibility
+When the Telegram path can't deliver (missing shortcut, `@mdr/chat-telegram` unavailable, cooldown suppression, or send throws), lib-log emits ONE structured event with the stable marker `criticalEscalationFailed: true` + `{ reason, shortcut, project }`. Reasons: `missing-shortcut`, `chat-telegram-unavailable`, `cooldown`, `send-failed`. Detect via `ax`:
+
+```bash
+ax "['wsh-logs'] | extend ctx = parse_json(context) | where ctx.criticalEscalationFailed == true" --start-time 1d
+```
+
+This ensures "we sent a critical" is auditable even when Telegram is dead — previously these paths silently downgraded to `warn` with no stable marker.
 
 ## Agent Guidelines
 
@@ -2476,7 +2522,7 @@ interface Logger {
   error(message: string, fields?: Record<string, unknown>): void;
   telemetry(message: string, fields?: Record<string, unknown>): void;
   trace(message: string, fields?: Record<string, unknown>): void;
-  child(fields: Record<string, unknown>): Logger;
+  child?(fields: Record<string, unknown>): Logger;
   flush(): Promise<void>;
 }
 
@@ -2546,12 +2592,21 @@ export function createLogger(name: string): Logger {
  * Call before process.exit() to ensure piped stdout is fully written.
  * Bun's process.exit() does not wait for pending stdout writes; without
  * this drain, large piped output (>64KB) gets silently truncated.
+ *
+ * Checks `writableNeedDrain` and awaits the 'drain' event before the sentinel
+ * empty-write. The sentinel alone is not enough: in Node, write callbacks fire
+ * in write-order and a trailing `write('', cb)` waits for prior data; in Bun
+ * with pipe backpressure, the empty-write callback can fire before the earlier
+ * large write finishes draining, so we need the explicit drain wait first.
  */
 export async function shutdown(): Promise<void> {
   if (libLog.shutdown) {
     await libLog.shutdown();
   }
   if (!process.stdout.writableEnded) {
+    if (process.stdout.writableNeedDrain) {
+      await new Promise<void>(resolve => process.stdout.once('drain', resolve));
+    }
     await new Promise<void>(resolve => process.stdout.write('', () => resolve()));
   }
 }
@@ -2571,23 +2626,23 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (38.1k)
+# lib-utils (39.3k)
 ## Documentation (3.3k)
 - [@SKILL.md (2.3k)](https://hackmd.io/97moevI4QN6d_6Rs3IxALg)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
 
-## Code (2.8k)
+## Code (2.9k)
 - @scripts/_LIB-UTILS_update-dependents (1.2k)
 - @src/env.ts (600)
-- @src/logger.ts (1k)
+- @src/logger.ts (1.1k)
 
-## requiredSkills (32k)
+## requiredSkills (33k)
 - [@../dev-typescript/SKILL.md (10k)](https://hackmd.io/aKiluldnSHm5CEfQEW7Szw)
   - [@../dev-core/SKILL.md (10k)](https://hackmd.io/SHjcFQaXQbCyt7QWIe1TwA)
   - [@SKILL.md (2k)](https://hackmd.io/97moevI4QN6d_6Rs3IxALg)
 - @../lib-1password/SKILL.md (2k)
-- [@../lib-log/SKILL.md (4k)](https://hackmd.io/s5FaR0hVS6yNqHxg5y2W2A)
+- [@../lib-log/SKILL.md (5k)](https://hackmd.io/MEsItP9cS7yVldf73XkzBw)
   - @../lib-log/README.md (1k)
 - [@../edit-skill/SKILL.md (3k)](https://hackmd.io/AB9MgVCXQKmaMxhqQrf2Fg)
 
@@ -2702,7 +2757,7 @@ File: lib-utils/package.json
     "lint": "eslint '{src,test}/**/*.ts'",
     "lint:fix": "eslint '{src,test}/**/*.ts' --fix",
     "test": "bun run lint && bun run typecheck && bun run test:unit",
-    "test:unit": "dt wrap -- timeout --foreground 300 ./node_modules/.bin/vitest run test/unit",
+    "test:unit": "dt wrap -- timeout --foreground 300 ./node_modules/.bin/vitest run test/unit --passWithNoTests",
     "with-lock:install": "with-lock --project-root . -- bun install",
     "preinstall": "with-lock preinstall-guard @mdr/lib-utils"
   },

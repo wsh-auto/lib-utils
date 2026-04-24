@@ -16,7 +16,7 @@ interface Logger {
   error(message: string, fields?: Record<string, unknown>): void;
   telemetry(message: string, fields?: Record<string, unknown>): void;
   trace(message: string, fields?: Record<string, unknown>): void;
-  child(fields: Record<string, unknown>): Logger;
+  child?(fields: Record<string, unknown>): Logger;
   flush(): Promise<void>;
 }
 
@@ -86,12 +86,21 @@ export function createLogger(name: string): Logger {
  * Call before process.exit() to ensure piped stdout is fully written.
  * Bun's process.exit() does not wait for pending stdout writes; without
  * this drain, large piped output (>64KB) gets silently truncated.
+ *
+ * Loops on `writableNeedDrain` because a payload larger than the stream's
+ * highWaterMark (Node default 16KB) needs multiple drain cycles; one 'drain'
+ * event only clears one cycle. The trailing sentinel `write('', cb)` flushes
+ * anything still in-flight — necessary because the empty-write callback can
+ * fire out-of-order relative to earlier writes under Bun pipe backpressure.
  */
 export async function shutdown(): Promise<void> {
   if (libLog.shutdown) {
     await libLog.shutdown();
   }
   if (!process.stdout.writableEnded) {
+    while (process.stdout.writableNeedDrain) {
+      await new Promise<void>(resolve => process.stdout.once('drain', resolve));
+    }
     await new Promise<void>(resolve => process.stdout.write('', () => resolve()));
   }
 }

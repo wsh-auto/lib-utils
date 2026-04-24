@@ -51,7 +51,7 @@
     "lint": "eslint '{src,test}/**/*.ts'",
     "lint:fix": "eslint '{src,test}/**/*.ts' --fix",
     "test": "bun run lint && bun run typecheck && bun run test:unit",
-    "test:unit": "dt wrap -- timeout --foreground 300 ./node_modules/.bin/vitest run test/unit",
+    "test:unit": "dt wrap -- timeout --foreground 300 ./node_modules/.bin/vitest run test/unit --passWithNoTests",
     "with-lock:install": "with-lock --project-root . -- bun install",
     "preinstall": "with-lock preinstall-guard @mdr/lib-utils"
   },
