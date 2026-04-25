@@ -2452,6 +2452,7 @@ File: lib-utils/src/env.ts
  */
 
 import type { DotenvConfigOutput } from 'dotenv';
+import { isOptionalDepMissing } from './optional-dep.js';
 
 /** Logger interface - console and lib-log Logger both satisfy this */
 interface Log {
@@ -2469,7 +2470,12 @@ type InitEnvFn = (root: string, skip: string[], log: Log) => DotenvConfigOutput;
 let lib1p: { initEnv: InitEnvFn };
 try {
   lib1p = await import('@mdr/lib-1password');
-} catch {
+} catch (err) {
+  // Only treat as "lib-1password missing" when the error clearly
+  // identifies @mdr/lib-1password itself as the missing target.
+  // Transitive-dep failures re-throw so the real root cause surfaces
+  // instead of the misleading FATAL below.
+  if (!isOptionalDepMissing(err, '@mdr/lib-1password')) throw err;
   const caller = process.argv[1] || 'unknown';
   if (process.env.CI) {
     // CI: lib-1password not needed, use stub that returns empty result
@@ -2514,6 +2520,8 @@ File: lib-utils/src/logger.ts
  * - Missing dep outside CI: fatal error (forces proper setup)
  */
 
+import { isOptionalDepMissing } from './optional-dep.js';
+
 interface Logger {
   critical(message: string, fields?: Record<string, unknown>): void;
   debug(message: string, fields?: Record<string, unknown>): void;
@@ -2557,7 +2565,12 @@ function _createStubLogger(name: string, parentFields: Record<string, unknown> =
 let libLog: { createLogger: CreateLoggerFn; shutdown?: () => Promise<void> };
 try {
   libLog = await import('@mdr/lib-log');
-} catch {
+} catch (err) {
+  // Only treat as "lib-log missing" when the error clearly identifies
+  // @mdr/lib-log itself as the missing target. Transitive-dep failures
+  // inside lib-log (e.g. a missing peer of lib-log) re-throw so the
+  // real root cause is visible instead of the misleading FATAL below.
+  if (!isOptionalDepMissing(err, '@mdr/lib-log')) throw err;
   const caller = process.argv[1] || 'unknown';
   if (process.env.CI) {
     // CI: lib-log not needed, use console-based stub
@@ -2593,18 +2606,18 @@ export function createLogger(name: string): Logger {
  * Bun's process.exit() does not wait for pending stdout writes; without
  * this drain, large piped output (>64KB) gets silently truncated.
  *
- * Checks `writableNeedDrain` and awaits the 'drain' event before the sentinel
- * empty-write. The sentinel alone is not enough: in Node, write callbacks fire
- * in write-order and a trailing `write('', cb)` waits for prior data; in Bun
- * with pipe backpressure, the empty-write callback can fire before the earlier
- * large write finishes draining, so we need the explicit drain wait first.
+ * Loops on `writableNeedDrain` because a payload larger than the stream's
+ * highWaterMark (Node default 16KB) needs multiple drain cycles; one 'drain'
+ * event only clears one cycle. The trailing sentinel `write('', cb)` flushes
+ * anything still in-flight — necessary because the empty-write callback can
+ * fire out-of-order relative to earlier writes under Bun pipe backpressure.
  */
 export async function shutdown(): Promise<void> {
   if (libLog.shutdown) {
     await libLog.shutdown();
   }
   if (!process.stdout.writableEnded) {
-    if (process.stdout.writableNeedDrain) {
+    while (process.stdout.writableNeedDrain) {
       await new Promise<void>(resolve => process.stdout.once('drain', resolve));
     }
     await new Promise<void>(resolve => process.stdout.write('', () => resolve()));
@@ -2626,16 +2639,16 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (39.3k)
+# lib-utils (39.5k)
 ## Documentation (3.3k)
 - [@SKILL.md (2.3k)](https://hackmd.io/97moevI4QN6d_6Rs3IxALg)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
 
-## Code (2.9k)
+## Code (3.1k)
 - @scripts/_LIB-UTILS_update-dependents (1.2k)
-- @src/env.ts (600)
-- @src/logger.ts (1.1k)
+- @src/env.ts (700)
+- @src/logger.ts (1.2k)
 
 ## requiredSkills (33k)
 - [@../dev-typescript/SKILL.md (10k)](https://hackmd.io/aKiluldnSHm5CEfQEW7Szw)

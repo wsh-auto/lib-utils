@@ -9,6 +9,7 @@
  */
 
 import type { DotenvConfigOutput } from 'dotenv';
+import { isOptionalDepMissing } from './optional-dep.js';
 
 /** Logger interface - console and lib-log Logger both satisfy this */
 interface Log {
@@ -26,7 +27,12 @@ type InitEnvFn = (root: string, skip: string[], log: Log) => DotenvConfigOutput;
 let lib1p: { initEnv: InitEnvFn };
 try {
   lib1p = await import('@mdr/lib-1password');
-} catch {
+} catch (err) {
+  // Only treat as "lib-1password missing" when the error clearly
+  // identifies @mdr/lib-1password itself as the missing target.
+  // Transitive-dep failures re-throw so the real root cause surfaces
+  // instead of the misleading FATAL below.
+  if (!isOptionalDepMissing(err, '@mdr/lib-1password')) throw err;
   const caller = process.argv[1] || 'unknown';
   if (process.env.CI) {
     // CI: lib-1password not needed, use stub that returns empty result

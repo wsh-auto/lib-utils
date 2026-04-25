@@ -10,16 +10,16 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (39.3k)
+# lib-utils (39.5k)
 ## Documentation (3.3k)
 - [@SKILL.md (2.3k)](https://hackmd.io/97moevI4QN6d_6Rs3IxALg)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
 
-## Code (2.9k)
+## Code (3.1k)
 - @scripts/_LIB-UTILS_update-dependents (1.2k)
-- @src/env.ts (600)
-- @src/logger.ts (1.1k)
+- @src/env.ts (700)
+- @src/logger.ts (1.2k)
 
 ## requiredSkills (33k)
 - [@../dev-typescript/SKILL.md (10k)](https://hackmd.io/aKiluldnSHm5CEfQEW7Szw)

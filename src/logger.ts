@@ -8,6 +8,8 @@
  * - Missing dep outside CI: fatal error (forces proper setup)
  */
 
+import { isOptionalDepMissing } from './optional-dep.js';
+
 interface Logger {
   critical(message: string, fields?: Record<string, unknown>): void;
   debug(message: string, fields?: Record<string, unknown>): void;
@@ -51,7 +53,12 @@ function _createStubLogger(name: string, parentFields: Record<string, unknown> =
 let libLog: { createLogger: CreateLoggerFn; shutdown?: () => Promise<void> };
 try {
   libLog = await import('@mdr/lib-log');
-} catch {
+} catch (err) {
+  // Only treat as "lib-log missing" when the error clearly identifies
+  // @mdr/lib-log itself as the missing target. Transitive-dep failures
+  // inside lib-log (e.g. a missing peer of lib-log) re-throw so the
+  // real root cause is visible instead of the misleading FATAL below.
+  if (!isOptionalDepMissing(err, '@mdr/lib-log')) throw err;
   const caller = process.argv[1] || 'unknown';
   if (process.env.CI) {
     // CI: lib-log not needed, use console-based stub
