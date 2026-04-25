@@ -2301,11 +2301,17 @@ ${CYAN}OPTIONS${NC}
     ${YELLOW}--clean${NC}           Also remove node_modules (including workspace subdirs)
     ${YELLOW}--dry-run${NC}         List projects without updating
     ${YELLOW}--serial${NC}          Run sequentially instead of parallel
+    ${YELLOW}--skip-links${NC}      Skip the bun link bootstrap pre-pass
+    ${YELLOW}--links-only${NC}      Only run bun link bootstrap, skip dependents install
     ${YELLOW}--help${NC}, ${YELLOW}-h${NC}       Show this help message
 
 ${CYAN}EXAMPLES${NC}
-    ${DIM}# Update all dependents (parallel)${NC}
+    ${DIM}# Update all dependents (parallel) — also bootstraps bun link state${NC}
     _LIB-UTILS_update-dependents
+
+    ${DIM}# Bootstrap a fresh machine: register all link: packages, no installs${NC}
+    ${DIM}# Note: bun link state is per-machine - run on each machine separately${NC}
+    _LIB-UTILS_update-dependents --links-only
 
     ${DIM}# Preview what would be updated${NC}
     _LIB-UTILS_update-dependents --dry-run
@@ -2317,6 +2323,8 @@ EOF
 CLEAN=false
 DRY_RUN=false
 PARALLEL=true
+SKIP_LINKS=false
+LINKS_ONLY=false
 MAX_JOBS=8
 
 for arg in "$@"; do
@@ -2325,9 +2333,87 @@ for arg in "$@"; do
     --clean) CLEAN=true ;;
     --dry-run) DRY_RUN=true ;;
     --serial) PARALLEL=false ;;
+    --skip-links) SKIP_LINKS=true ;;
+    --links-only) LINKS_ONLY=true ;;
     *) echo "Unknown option: $arg"; show_help; exit 1 ;;
   esac
 done
+
+# Bootstrap bun link registrations across the monorepo.
+# Discovers every link:@scope/name reference in non-vendored package.json files,
+# locates each source dir (the package.json declaring "name": "<pkg>"), and
+# runs `bun link` from there. Idempotent — safe to run repeatedly.
+bootstrap_links() {
+  echo "${CYAN}Bootstrapping bun link registrations...${NC}"
+
+  for tool in rg jq bun; do
+    command -v "$tool" >/dev/null 2>&1 || {
+      echo "${RED}Required tool not in PATH: $tool${NC}" >&2
+      return 1
+    }
+  done
+
+  local roots=()
+  for r in ~/mnt/mdr ~/mnt/tt ~/mnt/wsh; do [[ -d "$r" ]] && roots+=("$r"); done
+  if [[ ${#roots[@]} -eq 0 ]]; then
+    echo "  ${YELLOW}No roots found under ~/mnt${NC}"
+    return
+  fi
+
+  # Build pkg_name -> source_dir map from all non-vendored package.json
+  declare -A PKG_TO_DIR
+  local pjson name
+  while IFS= read -r pjson; do
+    name=$(jq -r '.name // empty' "$pjson" 2>/dev/null)
+    [[ -n "$name" ]] && PKG_TO_DIR[$name]=$(dirname "$pjson")
+  done < <(rg --no-ignore --files \
+    --glob '**/package.json' \
+    --glob '!**/node_modules/**' \
+    --glob '!**/dist/**' \
+    --glob '!**/.bun/**' \
+    "${roots[@]}" 2>/dev/null)
+
+  # Find all unique link:@scope/name references
+  mapfile -t LINK_PKGS < <(
+    rg --no-ignore --no-filename -o -e '"link:(@[^"]+)"' -r '$1' \
+      --glob '**/package.json' \
+      --glob '!**/node_modules/**' \
+      "${roots[@]}" 2>/dev/null | sort -u
+  )
+
+  if [[ ${#LINK_PKGS[@]} -eq 0 ]]; then
+    echo "  ${DIM}No link: deps found${NC}"
+    return
+  fi
+
+  local registered=0 failed=0 missing=0
+  for pkg in "${LINK_PKGS[@]}"; do
+    local src="${PKG_TO_DIR[$pkg]:-}"
+    if [[ -z "$src" ]]; then
+      printf "  ${YELLOW}?${NC} %s ${DIM}source not found${NC}\n" "$pkg"
+      ((missing++)) || true
+      continue
+    fi
+    if (cd "$src" && bun link >/dev/null 2>&1); then
+      printf "  ${GREEN}✓${NC} %s ${DIM}%s${NC}\n" "$pkg" "${src/#$HOME/~}"
+      ((registered++)) || true
+    else
+      printf "  ${RED}✗${NC} %s ${DIM}bun link failed${NC}\n" "$pkg"
+      ((failed++)) || true
+    fi
+  done
+
+  printf "${CYAN}Links:${NC} ${GREEN}%d ok${NC}" "$registered"
+  [[ $failed -gt 0 ]] && printf ", ${RED}%d failed${NC}" "$failed"
+  [[ $missing -gt 0 ]] && printf ", ${YELLOW}%d missing-source${NC}" "$missing"
+  echo
+  echo
+}
+
+if ! $SKIP_LINKS; then
+  bootstrap_links
+  if $LINKS_ONLY; then exit 0; fi
+fi
 
 echo "${CYAN}Scanning ~/mnt for @mdr/lib-utils dependents...${NC}"
 
@@ -2639,21 +2725,21 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (39.5k)
+# lib-utils (40.2k)
 ## Documentation (3.3k)
-- [@SKILL.md (2.3k)](https://hackmd.io/97moevI4QN6d_6Rs3IxALg)
+- [@SKILL.md (2.3k)](https://hackmd.io/l07wsxmXQBiIND0y36i2Ig)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
 
-## Code (3.1k)
-- @scripts/_LIB-UTILS_update-dependents (1.2k)
+## Code (3.9k)
+- @scripts/_LIB-UTILS_update-dependents (2k)
 - @src/env.ts (700)
 - @src/logger.ts (1.2k)
 
 ## requiredSkills (33k)
 - [@../dev-typescript/SKILL.md (10k)](https://hackmd.io/aKiluldnSHm5CEfQEW7Szw)
   - [@../dev-core/SKILL.md (10k)](https://hackmd.io/SHjcFQaXQbCyt7QWIe1TwA)
-  - [@SKILL.md (2k)](https://hackmd.io/97moevI4QN6d_6Rs3IxALg)
+  - [@SKILL.md (2k)](https://hackmd.io/l07wsxmXQBiIND0y36i2Ig)
 - @../lib-1password/SKILL.md (2k)
 - [@../lib-log/SKILL.md (5k)](https://hackmd.io/MEsItP9cS7yVldf73XkzBw)
   - @../lib-log/README.md (1k)
@@ -2793,7 +2879,7 @@ File: lib-utils/SKILL.md
 name: lib-utils
 description: >-
   CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup.
-hackmd: https://hackmd.io/97moevI4QN6d_6Rs3IxALg
+hackmd: https://hackmd.io/l07wsxmXQBiIND0y36i2Ig
 ---
 # lib-utils
 
@@ -2807,8 +2893,9 @@ Utilities that enhance development but gracefully degrade in CI environments.
 
 ## TABLE OF CONTENTS
 - Installation
-- Logging
-  - lib-log / logger.ts - createLogger(project-name)
+- lib-log / Logging
+  - logger.ts - createLogger(project-name)
+  - Logging Policy
   - Browser - createLogger(project-name)
   - Querying Logs: `ax` CLI
 - lib-1password / env.ts - initEnv(projectRoot, skipIfEnvVars?, log?)
@@ -2872,7 +2959,7 @@ await log.flush();
 
 **See `$mdr:lib-log` for:**
 - Python usage (`from lib_log import create_logger`)
-- CRITICAL escalation (Telegram routing via `chat-telegram`, 5min default cooldown)
+- log.critical escalation (Telegram routing and agentic spawn via `chat-telegram`, 5min default cooldown)
 - Axiom schema (8 columns: `_time`, `level`, `message`, `project`, `env`, `hostname`, `context`, `error`)
 - Token auto-load from `~/mnt/mdr/skills/lib-log/.env`; 3-token least-privilege split (ingest / frontend / query)
 - Logger naming: `{org}:{project}[:{subsystem}]` - name must match code location
@@ -2880,6 +2967,7 @@ await log.flush();
 - Large values: no write-time truncation, but keep under ~100KB/10s; `ax` read-time truncates to 200 chars (`ax --full` to override)
 - Runtime defaults in `assets/config.yml` (cooldown, flush timeout, dataset, console level)
 
+### Logging Policy
 **CLI logging policy:**
 - `stdout` - composable data only (JSON, IDs, paths, tables). Must contain nothing that wouldn't make sense piped to another program. Banned: `console.log` for progress/status messages.
 - `stderr` - everything useful for debugging later (state, status, progress, decisions, errors). MUST go through lib-log (`log.info`/`log.debug`/etc.), never via raw `console.error`. `log.*()` already writes to stderr via `StderrTransport` and also ships to Axiom, so `console.error` double-prints locally while bypassing structured logging and cloud persistence. For CLI catch blocks, use `log.warn()` for handled exits and `log.error()` for bug paths; see `$mdr:dev-core` for the single-exit pattern.

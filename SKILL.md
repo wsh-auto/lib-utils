@@ -2,7 +2,7 @@
 name: lib-utils
 description: >-
   CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup.
-hackmd: https://hackmd.io/97moevI4QN6d_6Rs3IxALg
+hackmd: https://hackmd.io/l07wsxmXQBiIND0y36i2Ig
 ---
 # lib-utils
 
@@ -16,8 +16,9 @@ Utilities that enhance development but gracefully degrade in CI environments.
 
 ## TABLE OF CONTENTS
 - Installation
-- Logging
-  - lib-log / logger.ts - createLogger(project-name)
+- lib-log / Logging
+  - logger.ts - createLogger(project-name)
+  - Logging Policy
   - Browser - createLogger(project-name)
   - Querying Logs: `ax` CLI
 - lib-1password / env.ts - initEnv(projectRoot, skipIfEnvVars?, log?)
@@ -81,7 +82,7 @@ await log.flush();
 
 **See `$mdr:lib-log` for:**
 - Python usage (`from lib_log import create_logger`)
-- CRITICAL escalation (Telegram routing via `chat-telegram`, 5min default cooldown)
+- log.critical escalation (Telegram routing and agentic spawn via `chat-telegram`, 5min default cooldown)
 - Axiom schema (8 columns: `_time`, `level`, `message`, `project`, `env`, `hostname`, `context`, `error`)
 - Token auto-load from `~/mnt/mdr/skills/lib-log/.env`; 3-token least-privilege split (ingest / frontend / query)
 - Logger naming: `{org}:{project}[:{subsystem}]` - name must match code location
@@ -89,6 +90,7 @@ await log.flush();
 - Large values: no write-time truncation, but keep under ~100KB/10s; `ax` read-time truncates to 200 chars (`ax --full` to override)
 - Runtime defaults in `assets/config.yml` (cooldown, flush timeout, dataset, console level)
 
+### Logging Policy
 **CLI logging policy:**
 - `stdout` - composable data only (JSON, IDs, paths, tables). Must contain nothing that wouldn't make sense piped to another program. Banned: `console.log` for progress/status messages.
 - `stderr` - everything useful for debugging later (state, status, progress, decisions, errors). MUST go through lib-log (`log.info`/`log.debug`/etc.), never via raw `console.error`. `log.*()` already writes to stderr via `StderrTransport` and also ships to Axiom, so `console.error` double-prints locally while bypassing structured logging and cloud persistence. For CLI catch blocks, use `log.warn()` for handled exits and `log.error()` for bug paths; see `$mdr:dev-core` for the single-exit pattern.
