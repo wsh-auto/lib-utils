@@ -23,6 +23,7 @@ Utilities that enhance development but gracefully degrade in CI environments.
   - Browser - createLogger(project-name)
   - Querying Logs: `ax` CLI
 - helpers / bunWrite()
+- helpers / execWithLog()
 - lib-1password / env.ts - initEnv(projectRoot, skipIfEnvVars?, log?)
 - Scripts
 
@@ -110,7 +111,26 @@ await log.flush();
 
 **Don't log** high-volume operations at info level (>45/min: e.g. polling loops).
 
-**Log messages should be single-line.** No `\n` in log strings. Use the structured context object for multi-field data instead of formatting a multi-line string. Multi-line log messages break `ax` queries, `grep`, and Axiom dashboard rendering.
+**Log calls MUST be a single source-code line, including the structured context object.**
+- The entire `log.X('msg', { ...ctx })` call goes on one line — message + context object together.
+- The message string contains no `\n`.
+- Multi-field data goes in the inline `{ ...ctx }` object on the same line.
+- **Exception to the 100-char single-line preference:** log calls override `$dev-core` 'Code Style: Single-Line Preference' — long context objects don't justify wrapping.
+
+Why: `grep`/`rg` for `log\.` returns complete call sites with all fields visible. `ax` dashboards render cleanly. Multi-line wrap hides context fields from text search and breaks Axiom row rendering.
+
+Banned shape:
+```typescript
+log.debug('thing happened', {
+  field1,
+  field2,
+});
+```
+
+Correct shape:
+```typescript
+log.debug('thing happened', { field1, field2 });
+```
 
 The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `LOG_LEVEL=debug` via `overmind.env`. All levels still ship to Axiom.
 
@@ -169,6 +189,21 @@ Use `bunWrite()` for any CLI `--json` branch (or other large stdout/stderr emit)
 - On Node (no Bun global), falls back to `process.stdout.write(buf, callback)` so the same call site works in dual-runtime libs.
 - Implementation lives in `@mdr/lib-helpers` (pure, no optional deps); re-exported through `@mdr/lib-utils/helpers` so consumers can pick whichever surface they already depend on.
 - Under-the-hood mechanism, refuted alternatives, and the original investigation are documented in `~/mnt/plans/tidy-weaving-hellman.md` (`hackmd: g5bQPS4yT0yMooinFuJLNQ`).
+
+## helpers / execWithLog()
+
+```typescript
+import { execWithLog } from '@mdr/lib-utils/helpers';
+
+const out = execWithLog('tt', ['panes', '--json'], { timeoutMs: 15_000, log });
+```
+
+Use `execWithLog()` for synchronous subprocess calls with timeout budgets.
+- `timeoutMs` is required and maps to Node's `timeout`; callers do not pass bare `timeout`.
+- `log` is optional and only needs `warn(message, fields)`; without it, the helper falls back to `console.warn`.
+- On `ETIMEDOUT`, it emits `subprocess timeout` with `{ cmd, args, timeoutMs, elapsedMs, signal }`, then throws `ExecTimeoutError`.
+- Non-timeout subprocess failures rethrow unchanged.
+- Implementation lives in `@mdr/lib-helpers`; `@mdr/lib-utils/helpers` re-exports it for broad consumers.
 
 ## lib-1password / env.ts - initEnv(projectRoot, skipIfEnvVars?, log?)
 
