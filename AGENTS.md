@@ -2112,15 +2112,17 @@ critical:
   ratePerProjectWindowMs: 3600000
   ratePerProjectMaxMessages: 5
   overflowTemplate: |
-    [RATE LIMIT] {scope}={key} exceeded {max}/{windowMins}min.
-    {suppressedCount} criticals dropped during this window.
-    Load $mdr:dev-debug. Investigate via:
-      ax --project '*{project}*' --start-time {windowMins}m
+    PRODUCTION INCIDENT (rate-limited) — assume user is ASLEEP, prod MIGHT BE DOWN.
+    [RATE LIMIT] {scope}={key} exceeded {max}/{windowMins}min. {suppressedCount} criticals dropped this window.
   messageTemplate:
     header: "CRITICAL incident in {project}"
     messagePrefix: "Message:"
     fieldsPrefix: "Fields:"
     errorPrefix: "Error:"
+  debugInstructions:
+    # Shared by normal critical AND overflow paths; overflow widens {startTime} to the rate-limit window.
+    firstActions:
+      - "Follow $mdr:dev-critical incident response phases (start at Phase 1)."
 ratelimit:
   persistPath: "~/mnt/data/lib-log/ratelimit.json"
   persistDebounceMs: 5000
@@ -2318,10 +2320,10 @@ PRODUCTION INCIDENT (rate-limited) — assume user is ASLEEP, prod MIGHT BE DOWN
 [RATE LIMIT] line=src/foo.ts:42 exceeded 2/60min. 14 criticals dropped this window.
 
 PRODUCTION INCIDENT — assume user is ASLEEP, prod MIGHT BE DOWN. Drive to RCA + fix without bouncing back.
-LOAD IMMEDIATELY: $mdr:dev-critical, $mdr:dev-debug, $mdr:lib-log, $mdr:ops-pmm, $mdr:dev-test
+LOAD IMMEDIATELY: $mdr:dev-critical, $mdr:dev-debug, $mdr:dev-test, $mdr:lib-log, $mdr:ops-pmm, $mdr:wf-manage
 
 First Actions:
-- Attach to vp-eng: `tt send --notify <vp-eng-pane> $TT_PANE` (find via `tt agents --json | jq '."id-vpeng"'`; see $mdr:id-vpeng)
+- Follow $mdr:dev-critical incident response phases (start at Phase 1).
 
 Debug Checklist:
 - Reproducer: (not supplied)
@@ -2365,7 +2367,7 @@ log.critical('Daemon loop crashed', {
 Every `critical` Telegram payload auto-appends:
 - **Process state** (crash-time snapshot, cannot be recovered after exit): pid, uptime, hostname, rssMb.
 - **Source** — `file:line` of the first non-lib-log frame (from the Error stack, or synthetic if no Error is supplied).
-- **First Actions** (rendered above the Debug Checklist when `firstActions` is non-empty) — ready-to-paste handoff lines from `assets/config.yml` `critical.debugInstructions.firstActions`. Default ships ONE line that tells the woken agent how to attach to the on-call vp-eng pane via `tt send --notify`. Set `firstActions: []` per-logger to suppress the section entirely.
+- **First Actions** (rendered above the Debug Checklist when `firstActions` is non-empty) — ready-to-paste handoff lines from `assets/config.yml` `critical.debugInstructions.firstActions`. Default ships ONE line pointing the woken agent at `$mdr:dev-critical` as the runbook owner (Phase 1 covers vp-eng attach, worker spawn, RCA gate). Set `firstActions: []` per-logger to suppress the section entirely.
 - **Debug Checklist** — templated from `assets/config.yml` `critical.debugInstructions.*`:
   - Reproducer + relevant files from the caller fields
   - `ax` command pre-filled with this project and the default `--start-time` window (overflow widens this to the rate-limit window automatically)
@@ -2389,7 +2391,7 @@ This ensures "we sent a critical" is auditable even when Telegram is dead — pr
 ### API
 - Import from `@mdr/lib-log/death-watch`: `installDeathWatch(options)`.
 - Required option: `loggerName`, matching the daemon's existing logger root.
-- Optional options: `criticalThresholdMs`, `startupSuppressMs`, `emitIntervalMs`, `eventLoopResolutionMs`.
+- Optional options: `criticalThresholdMs`, `warmupMs`, `startupSuppressMs`, `emitIntervalMs`, `eventLoopResolutionMs`.
 - Return handle: `{ getMetrics, shutdown }`.
 - The primitive is process-singleton; repeated installs return the same handle.
 - Daemon consumers MUST call `handle.shutdown()` from `stop()`/teardown; it clears the interval, GC observer, event-loop histogram, and process listeners so tests and clean restarts can exit.
@@ -2402,7 +2404,7 @@ This ensures "we sent a critical" is auditable even when Telegram is dead — pr
 
 ### Alerting semantics
 - Debug metrics emit every `deathWatch.emitIntervalMs` from `assets/config.yml`.
-- `eventLoopP99Ms > criticalThresholdMs` fires `log.critical` only after `startupSuppressMs`.
+- `eventLoopP99Ms > criticalThresholdMs` fires `log.critical` only after process uptime exceeds `warmupMs` and install age exceeds `startupSuppressMs`.
 - Any new unhandled rejection or uncaught exception fires `log.critical` with no startup suppression.
 - Histograms reset after each emit, so each row describes the just-elapsed interval.
 
