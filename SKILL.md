@@ -2,7 +2,7 @@
 name: lib-utils
 description: >-
   CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup.
-hackmd: https://hackmd.io/l07wsxmXQBiIND0y36i2Ig
+hackmd: https://hackmd.io/HLTh-24XTZ62MUgvTW3oIQ
 ---
 # lib-utils
 
@@ -87,11 +87,13 @@ await log.flush();
 
 **See `$mdr:lib-log` for:**
 - Python usage (`from lib_log import create_logger`)
+- `deathWatch.measure(name, fn)` for daemon phase attribution; for the rollup recipe and worked example see `$dev-instrument` "Phase Attribution"
 - log.critical escalation (Telegram routing and agentic spawn via `chat-telegram`, 5min default cooldown)
 - Axiom schema (8 columns: `_time`, `level`, `message`, `project`, `env`, `hostname`, `context`, `error`)
 - Token auto-load from `~/mnt/mdr/skills/lib-log/.env`; 3-token least-privilege split (ingest / frontend / query)
 - Logger naming: `{org}:{project}[:{subsystem}]` - name must match code location
 - Error objects: pass directly (any key name) → auto-serialized to `error` column with `name`/`message`/`stack`/`code`/`cause`
+- Third-party API status codes: include `status.code=<n>` in the log message and structured context; see `$mdr:lib-log` Error Logging
 - Large values: no write-time truncation, but keep under ~100KB/10s; `ax` read-time truncates to 200 chars (`ax --full` to override)
 - Runtime defaults in `assets/config.yml` (cooldown, flush timeout, dataset, console level)
 
@@ -183,7 +185,7 @@ await bunWrite('stdout', JSON.stringify(result, null, 2) + '\n');
 await bunWrite('stderr', 'something happened\n');
 ```
 
-Use `bunWrite()` for any CLI `--json` branch (or other large stdout/stderr emit) that may exceed ~64KB. Under Bun on macOS, once anything attaches a listener to `process.stdout` (which `import('winston')` does as a side effect), `console.log` switches to a buffered path that drops bytes >64KB on `process.exit()` when the downstream reader is slow. `bunWrite()` delegates to `Bun.write(Bun.stdout, …)` which takes a different code path and delivers all bytes intact.
+Use `bunWrite()` for any CLI `--json` branch (or other large stdout/stderr emit) that may exceed ~64KB. Under Bun on macOS, once anything attaches a listener to `process.stdout` (which `import('winston')` does as a side effect), `console.log` switches to a buffered path that drops bytes >64KB on `process.exit()` when the downstream reader is slow. `bunWrite()` delegates to `Bun.write(Bun.stdout, …)` which takes a different code path and delivers all bytes intact. When auditing migrations to `bunWrite()`, search semantic JSON-output wrappers and raw stdout writes as well as direct `console.log(JSON.stringify(...))`, then smoke the shipped command through a pipe.
 
 - `stream` is a discriminator string (`'stdout'` or `'stderr'`), not a stream object — under Bun, `process.stdout` (Node-compat shim) and `Bun.stdout` (BunFile) are different objects, and the bug-bypassing path requires the BunFile.
 - On Node (no Bun global), falls back to `process.stdout.write(buf, callback)` so the same call site works in dual-runtime libs.

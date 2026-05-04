@@ -10,9 +10,9 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (45.3k)
-## Documentation (4.4k)
-- [@SKILL.md (3.4k)](https://hackmd.io/l07wsxmXQBiIND0y36i2Ig)
+# lib-utils (48.4k)
+## Documentation (4.5k)
+- [@SKILL.md (3.5k)](https://hackmd.io/HLTh-24XTZ62MUgvTW3oIQ)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
 
@@ -21,11 +21,11 @@ requiredFiles:
 - @src/env.ts (700)
 - @src/logger.ts (1.3k)
 
-## requiredSkills (37k)
+## requiredSkills (40k)
 - [@../dev-typescript/SKILL.md (10k)](https://hackmd.io/MQmOpQtPSoWcCVjYaWdHSA)
-  - [@../dev-core/SKILL.md (11k)](https://hackmd.io/CK-C5TeaRjybEtpSryFX-Q)
-  - [@SKILL.md (3k)](https://hackmd.io/l07wsxmXQBiIND0y36i2Ig)
+  - [@../dev-core/SKILL.md (12k)](https://hackmd.io/Rup-HnStTdabOBIt20BzXQ)
+  - [@SKILL.md (4k)](https://hackmd.io/HLTh-24XTZ62MUgvTW3oIQ)
 - @../lib-1password/SKILL.md (2k)
-- [@../lib-log/SKILL.md (7k)](https://hackmd.io/MEsItP9cS7yVldf73XkzBw)
+- [@../lib-log/SKILL.md (8k)](https://hackmd.io/WXfj2amORdmxbKTsmsccQg)
   - @../lib-log/README.md (1k)
-- [@../edit-skill/SKILL.md (3k)](https://hackmd.io/AB9MgVCXQKmaMxhqQrf2Fg)
+- [@../edit-skill/SKILL.md (3k)](https://hackmd.io/VbXD3le1Tu6FT98MtYSufg)
