@@ -9,6 +9,7 @@
  */
 
 import type { DotenvConfigOutput } from 'dotenv';
+import { isOptionalDepMissing } from './optional-dep.js';
 
 /** Logger interface - console and lib-log Logger both satisfy this */
 interface Log {
@@ -17,7 +18,7 @@ interface Log {
 }
 
 // Type matches lib-1password's initEnv signature
-type InitEnvFn = (root: string, skip: string[], log: Log) => DotenvConfigOutput;
+type InitEnvFn = (callerDir: string, skip: string[], log: Log) => DotenvConfigOutput;
 
 // Try to load lib-1password at module init. Will be either:
 // - The real lib-1password module (normal case)
@@ -26,7 +27,12 @@ type InitEnvFn = (root: string, skip: string[], log: Log) => DotenvConfigOutput;
 let lib1p: { initEnv: InitEnvFn };
 try {
   lib1p = await import('@mdr/lib-1password');
-} catch {
+} catch (err) {
+  // Only treat as "lib-1password missing" when the error clearly
+  // identifies @mdr/lib-1password itself as the missing target.
+  // Transitive-dep failures re-throw so the real root cause surfaces
+  // instead of the misleading FATAL below.
+  if (!isOptionalDepMissing(err, '@mdr/lib-1password')) throw err;
   const caller = process.argv[1] || 'unknown';
   if (process.env.CI) {
     // CI: lib-1password not needed, use stub that returns empty result
@@ -49,11 +55,11 @@ try {
  * Initialize environment from .env.template using 1Password CLI.
  * Safe to use in CI environments where lib-1password may not be installed.
  *
- * @param projectRoot - Directory containing .env.template and .env
+ * @param callerDir - Any dir inside the package; pass `import.meta.dirname`
  * @param skipIfEnvVars - Skip injection if ALL these env vars are already set
  * @param log - Logger with info/error methods (defaults to console)
  * @returns { parsed: Record<string, string> } - The loaded/skipped env vars
  */
-export function initEnv(projectRoot: string, skipIfEnvVars: string[] = [], log: Log = console): DotenvConfigOutput {
-  return lib1p.initEnv(projectRoot, skipIfEnvVars, log);
+export function initEnv(callerDir: string, skipIfEnvVars: string[] = [], log: Log = console): DotenvConfigOutput {
+  return lib1p.initEnv(callerDir, skipIfEnvVars, log);
 }

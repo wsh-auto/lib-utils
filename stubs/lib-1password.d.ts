@@ -11,7 +11,7 @@ declare module '@mdr/lib-1password' {
   }
 
   export function initEnv(
-    root: string,
+    callerDir: string,
     skip?: string[],
     log?: Log
   ): DotenvConfigOutput;

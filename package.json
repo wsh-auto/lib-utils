@@ -8,6 +8,9 @@
       "helpers": [
         "dist/helpers.d.ts"
       ],
+      "helpers/critical-guard": [
+        "dist/helpers/critical-guard.d.ts"
+      ],
       "logger": [
         "dist/logger.d.ts"
       ],
@@ -23,6 +26,10 @@
     "./helpers": {
       "types": "./dist/helpers.d.ts",
       "default": "./src/helpers.js"
+    },
+    "./helpers/critical-guard": {
+      "types": "./dist/helpers/critical-guard.d.ts",
+      "default": "./src/helpers/critical-guard.ts"
     },
     "./logger": {
       "types": "./dist/logger.d.ts",
@@ -40,6 +47,10 @@
   "dependencies": {
     "@mdr/lib-helpers": "link:@mdr/lib-helpers"
   },
+  "optionalDependencies": {
+    "@mdr/lib-log": "link:@mdr/lib-log",
+    "@mdr/lib-1password": "link:@mdr/lib-1password"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.check.json",
@@ -47,7 +58,7 @@
     "lint": "eslint '{src,test}/**/*.ts'",
     "lint:fix": "eslint '{src,test}/**/*.ts' --fix",
     "test": "bun run lint && bun run typecheck && bun run test:unit",
-    "test:unit": "dt wrap -- timeout --foreground 300 ./node_modules/.bin/vitest run test/unit",
+    "test:unit": "dt wrap -- timeout --foreground 300 ./node_modules/.bin/vitest run test/unit --passWithNoTests",
     "with-lock:install": "with-lock --project-root . -- bun install",
     "preinstall": "with-lock preinstall-guard @mdr/lib-utils"
   },

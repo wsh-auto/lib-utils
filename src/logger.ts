@@ -8,6 +8,8 @@
  * - Missing dep outside CI: fatal error (forces proper setup)
  */
 
+import { isOptionalDepMissing } from './optional-dep.js';
+
 interface Logger {
   critical(message: string, fields?: Record<string, unknown>): void;
   debug(message: string, fields?: Record<string, unknown>): void;
@@ -16,7 +18,7 @@ interface Logger {
   error(message: string, fields?: Record<string, unknown>): void;
   telemetry(message: string, fields?: Record<string, unknown>): void;
   trace(message: string, fields?: Record<string, unknown>): void;
-  child(fields: Record<string, unknown>): Logger;
+  child?(fields: Record<string, unknown>): Logger;
   flush(): Promise<void>;
 }
 
@@ -51,7 +53,12 @@ function _createStubLogger(name: string, parentFields: Record<string, unknown> =
 let libLog: { createLogger: CreateLoggerFn; shutdown?: () => Promise<void> };
 try {
   libLog = await import('@mdr/lib-log');
-} catch {
+} catch (err) {
+  // Only treat as "lib-log missing" when the error clearly identifies
+  // @mdr/lib-log itself as the missing target. Transitive-dep failures
+  // inside lib-log (e.g. a missing peer of lib-log) re-throw so the
+  // real root cause is visible instead of the misleading FATAL below.
+  if (!isOptionalDepMissing(err, '@mdr/lib-log')) throw err;
   const caller = process.argv[1] || 'unknown';
   if (process.env.CI) {
     // CI: lib-log not needed, use console-based stub
@@ -82,16 +89,41 @@ export function createLogger(name: string): Logger {
 }
 
 /**
- * Flush all pending logs, drain stdout, and reset the shared Axiom transport registry.
- * Call before process.exit() to ensure piped stdout is fully written.
- * Bun's process.exit() does not wait for pending stdout writes; without
- * this drain, large piped output (>64KB) gets silently truncated.
+ * Flush pending Axiom transports, release lib-log handles, and best-effort
+ * drain Node-stream stdout backpressure before process.exit().
+ *
+ * IMPORTANT — does NOT rescue Bun-truncated console.log output. Once anything
+ * touches `process.stdout` listeners (including `import('winston')`), Bun
+ * switches `console.log` to a buffered path that drops bytes >64KB on
+ * `process.exit()`. The bytes are dropped at write-time and shutdown() cannot
+ * recover them. For piped output >64KB, callers MUST use `bunWrite()` from
+ * `@mdr/lib-utils/helpers` at the write site instead of `console.log` —
+ * see `$mdr:lib-utils` SKILL.md `## lib-log / Logging` and the original
+ * investigation at `~/mnt/plans/tidy-weaving-hellman.md`.
+ *
+ * The Node-stream drain loop below remains useful in the Node-runtime fallback
+ * and for in-flight buffered writes that Bun exposes through the Node-compat
+ * stream shim.
  */
 export async function shutdown(): Promise<void> {
   if (libLog.shutdown) {
     await libLog.shutdown();
   }
-  if (!process.stdout.writableEnded) {
+  if (!process.stdout.destroyed && !process.stdout.writableEnded) {
+    while (process.stdout.writableNeedDrain) {
+      await new Promise<void>(resolve => {
+        const done = () => {
+          process.stdout.off('drain', done);
+          process.stdout.off('error', done);
+          process.stdout.off('close', done);
+          resolve();
+        };
+        process.stdout.once('drain', done);
+        process.stdout.once('error', done);
+        process.stdout.once('close', done);
+      });
+      if (process.stdout.destroyed || process.stdout.writableEnded) return;
+    }
     await new Promise<void>(resolve => process.stdout.write('', () => resolve()));
   }
 }

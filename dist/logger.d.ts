@@ -15,7 +15,7 @@ interface Logger {
     error(message: string, fields?: Record<string, unknown>): void;
     telemetry(message: string, fields?: Record<string, unknown>): void;
     trace(message: string, fields?: Record<string, unknown>): void;
-    child(fields: Record<string, unknown>): Logger;
+    child?(fields: Record<string, unknown>): Logger;
     flush(): Promise<void>;
 }
 /**
@@ -27,10 +27,21 @@ interface Logger {
  */
 export declare function createLogger(name: string): Logger;
 /**
- * Flush all pending logs, drain stdout, and reset the shared Axiom transport registry.
- * Call before process.exit() to ensure piped stdout is fully written.
- * Bun's process.exit() does not wait for pending stdout writes; without
- * this drain, large piped output (>64KB) gets silently truncated.
+ * Flush pending Axiom transports, release lib-log handles, and best-effort
+ * drain Node-stream stdout backpressure before process.exit().
+ *
+ * IMPORTANT — does NOT rescue Bun-truncated console.log output. Once anything
+ * touches `process.stdout` listeners (including `import('winston')`), Bun
+ * switches `console.log` to a buffered path that drops bytes >64KB on
+ * `process.exit()`. The bytes are dropped at write-time and shutdown() cannot
+ * recover them. For piped output >64KB, callers MUST use `bunWrite()` from
+ * `@mdr/lib-utils/helpers` at the write site instead of `console.log` —
+ * see `$mdr:lib-utils` SKILL.md `## lib-log / Logging` and the original
+ * investigation at `~/mnt/plans/tidy-weaving-hellman.md`.
+ *
+ * The Node-stream drain loop below remains useful in the Node-runtime fallback
+ * and for in-flight buffered writes that Bun exposes through the Node-compat
+ * stream shim.
  */
 export declare function shutdown(): Promise<void>;
 export {};
