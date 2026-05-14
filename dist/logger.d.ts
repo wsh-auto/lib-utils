@@ -7,6 +7,7 @@
  * - CI: console-based stub logger
  * - Missing dep outside CI: fatal error (forces proper setup)
  */
+/** Logger contract exposed by lib-log and the CI stub. */
 interface Logger {
     critical(message: string, fields?: Record<string, unknown>): void;
     debug(message: string, fields?: Record<string, unknown>): void;

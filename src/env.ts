@@ -11,13 +11,13 @@
 import type { DotenvConfigOutput } from 'dotenv';
 import { isOptionalDepMissing } from './optional-dep.js';
 
-/** Logger interface - console and lib-log Logger both satisfy this */
+/** Logger interface - console and lib-log Logger both satisfy this. */
 interface Log {
   info(msg: string, ...args: unknown[]): void;
   error(msg: string, ...args: unknown[]): void;
 }
 
-// Type matches lib-1password's initEnv signature
+/** Type matching lib-1password's initEnv signature. */
 type InitEnvFn = (callerDir: string, skip: string[], log: Log) => DotenvConfigOutput;
 
 // Try to load lib-1password at module init. Will be either:

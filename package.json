@@ -53,20 +53,20 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.check.json",
+    "typecheck": "tsc --noEmit -p tsconfig.check.json",
     "check": "bun run typecheck",
     "lint": "eslint '{src,test}/**/*.ts'",
     "lint:fix": "eslint '{src,test}/**/*.ts' --fix",
     "test": "bun run lint && bun run typecheck && bun run test:unit",
     "test:unit": "dt wrap -- timeout --foreground 300 ./node_modules/.bin/vitest run test/unit --passWithNoTests",
     "with-lock:install": "with-lock --project-root . -- bun install",
-    "preinstall": "with-lock preinstall-guard @mdr/lib-utils"
+    "preinstall": "with-lock preinstall-guard"
   },
   "devDependencies": {
     "@eslint/js": "8.57.0",
     "@mdr/dev-typescript": "link:@mdr/dev-typescript",
     "@types/node": "20.13.0",
-    "dotenv": "^17.2.3",
+    "dotenv": "17.2.3",
     "eslint": "8.57.0",
     "typescript": "5.4.5",
     "typescript-eslint": "7.11.0",

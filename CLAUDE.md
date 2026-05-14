@@ -16,7 +16,7 @@ requiredFiles:
 - @CONTRIBUTING.md (600)
 - @package.json (500)
 
-## Code (4k)
+## Code (4.1k)
 - @scripts/_LIB-UTILS_update-dependents (2k)
 - @src/env.ts (700)
 - @src/logger.ts (1.4k)

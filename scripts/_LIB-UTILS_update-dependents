@@ -31,6 +31,7 @@ ${CYAN}DESCRIPTION${NC}
 ${CYAN}OPTIONS${NC}
     ${YELLOW}--clean${NC}           Also remove node_modules (including workspace subdirs)
     ${YELLOW}--dry-run${NC}         List projects without updating
+    ${YELLOW}--json${NC}            Emit machine-readable results (required in agent context)
     ${YELLOW}--serial${NC}          Run sequentially instead of parallel
     ${YELLOW}--skip-links${NC}      Skip the bun link bootstrap pre-pass
     ${YELLOW}--links-only${NC}      Only run bun link bootstrap, skip dependents install
@@ -44,8 +45,8 @@ ${CYAN}EXAMPLES${NC}
     ${DIM}# Note: bun link state is per-machine - run on each machine separately${NC}
     _LIB-UTILS_update-dependents --links-only
 
-    ${DIM}# Preview what would be updated${NC}
-    _LIB-UTILS_update-dependents --dry-run
+    ${DIM}# Preview what would be updated in agent-safe JSON${NC}
+    _LIB-UTILS_update-dependents --dry-run --json
 
 ${DIM}AGENTS: MUST load \$mdr:lib-utils before editing or for context${NC}
 EOF
@@ -53,22 +54,44 @@ EOF
 
 CLEAN=false
 DRY_RUN=false
+JSON=false
 PARALLEL=true
 SKIP_LINKS=false
 LINKS_ONLY=false
 MAX_JOBS=8
+
+usage_error() {
+  {
+    echo "Error: $1"
+    show_help
+    echo
+    echo "Hint: _LIB-UTILS_update-dependents --help"
+  } >&2
+  exit 2
+}
 
 for arg in "$@"; do
   case $arg in
     --help|-h) show_help; exit 0 ;;
     --clean) CLEAN=true ;;
     --dry-run) DRY_RUN=true ;;
+    --json) JSON=true ;;
     --serial) PARALLEL=false ;;
     --skip-links) SKIP_LINKS=true ;;
     --links-only) LINKS_ONLY=true ;;
-    *) echo "Unknown option: $arg"; show_help; exit 1 ;;
+    *) usage_error "Unknown option: $arg" ;;
   esac
 done
+
+IS_AGENT="${CLAUDECODE:-}${CODEX_SANDBOX:-}${CODEX_THREAD_ID:-}${GEMINI_CLI:-}"
+if [[ -n "$IS_AGENT" && "$JSON" != "true" ]]; then
+  usage_error "Agent context detected; rerun with --json for agent-safe output."
+fi
+
+if $JSON; then
+  PARALLEL=false
+  command -v jq >/dev/null 2>&1 || usage_error "Required tool not in PATH for --json: jq"
+fi
 
 # Bootstrap bun link registrations across the monorepo.
 # Discovers every link:@scope/name reference in non-vendored package.json files,
@@ -142,11 +165,17 @@ bootstrap_links() {
 }
 
 if ! $SKIP_LINKS; then
-  bootstrap_links
+  if $JSON; then
+    bootstrap_links >/dev/null
+  else
+    bootstrap_links
+  fi
   if $LINKS_ONLY; then exit 0; fi
 fi
 
-echo "${CYAN}Scanning ~/mnt for @mdr/lib-utils dependents...${NC}"
+if ! $JSON; then
+  echo "${CYAN}Scanning ~/mnt for @mdr/lib-utils dependents...${NC}"
+fi
 
 # Find workspace root (parent with "workspaces" in package.json), or return original dir
 find_workspace_root() {
@@ -173,14 +202,30 @@ mapfile -t DEPENDENTS < <(
 )
 
 if [[ ${#DEPENDENTS[@]} -eq 0 ]]; then
+  if $JSON; then
+    echo '{"dryRun":false,"count":0,"projects":[]}'
+    exit 0
+  fi
   echo "${YELLOW}No dependents found.${NC}"
   exit 0
 fi
 
-echo "Found ${GREEN}${#DEPENDENTS[@]}${NC} projects:"
-echo
+if ! $JSON; then
+  echo "Found ${GREEN}${#DEPENDENTS[@]}${NC} projects:"
+  echo
+fi
 
 if $DRY_RUN; then
+  if $JSON; then
+    printf '{"dryRun":true,"count":%d,"projects":[' "${#DEPENDENTS[@]}"
+    first=true
+    for dir in "${DEPENDENTS[@]}"; do
+      if $first; then first=false; else printf ','; fi
+      jq -Rn --arg path "$dir" '$path'
+    done
+    printf ']}\n'
+    exit 0
+  fi
   for dir in "${DEPENDENTS[@]}"; do
     echo "  ${DIM}${dir/#$HOME/\~}${NC}"
   done
@@ -191,14 +236,22 @@ fi
 
 # Simple failure counter using a file
 FAIL_FILE=$(mktemp)
+RESULT_FILE=$(mktemp)
 echo 0 > "$FAIL_FILE"
-trap 'rm -f "$FAIL_FILE"' EXIT
+trap 'rm -f "$FAIL_FILE" "$RESULT_FILE"' EXIT
 
 update_project() {
   local dir=$1
   local short_path="${dir/#$HOME/\~}"
 
-  cd "$dir" || { printf "  \x1b[31m✗\x1b[0m %s \x1b[2mcd failed\x1b[0m\n" "$short_path"; return 1; }
+  cd "$dir" || {
+    if $JSON; then
+      jq -cn --arg path "$dir" --arg error "cd failed" '{path:$path,ok:false,error:$error}' >> "$RESULT_FILE"
+    else
+      printf "  \x1b[31m✗\x1b[0m %s \x1b[2mcd failed\x1b[0m\n" "$short_path"
+    fi
+    return 1
+  }
   rm -f bun.lock bun.lockb
   if [[ "$CLEAN" == "true" ]]; then
     rm -rf node_modules
@@ -216,18 +269,26 @@ update_project() {
   if [[ $exit_code -eq 0 ]]; then
     local version
     version=$(echo "$output" | grep -o '@mdr/lib-utils@github:wsh-auto/lib-utils#[a-f0-9]*' | head -1 | sed 's/.*#//' | cut -c1-7)
-    printf "  \x1b[32m✓\x1b[0m %s \x1b[2m%s\x1b[0m\n" "$short_path" "${version:-ok}"
+    if $JSON; then
+      jq -cn --arg path "$dir" --arg version "${version:-ok}" '{path:$path,ok:true,version:$version}' >> "$RESULT_FILE"
+    else
+      printf "  \x1b[32m✓\x1b[0m %s \x1b[2m%s\x1b[0m\n" "$short_path" "${version:-ok}"
+    fi
     return 0
   else
     local err_msg
     err_msg=$(echo "$output" | grep -i -E 'error|fail' | head -1 | cut -c1-50)
-    printf "  \x1b[31m✗\x1b[0m %s \x1b[2m%s\x1b[0m\n" "$short_path" "${err_msg:-failed}"
+    if $JSON; then
+      jq -cn --arg path "$dir" --arg error "${err_msg:-failed}" '{path:$path,ok:false,error:$error}' >> "$RESULT_FILE"
+    else
+      printf "  \x1b[31m✗\x1b[0m %s \x1b[2m%s\x1b[0m\n" "$short_path" "${err_msg:-failed}"
+    fi
     return 1
   fi
 }
 
 export -f update_project
-export HOME CLEAN
+export HOME CLEAN JSON RESULT_FILE
 
 FAIL=0
 if $PARALLEL; then
@@ -251,6 +312,10 @@ fi
 
 SUCCESS=$((${#DEPENDENTS[@]} - FAIL))
 
-echo
-echo "${CYAN}Done:${NC} ${GREEN}${SUCCESS} updated${NC}$( [[ $FAIL -gt 0 ]] && echo ", ${RED}${FAIL} failed${NC}" )"
+if $JSON; then
+  jq -s --argjson total "${#DEPENDENTS[@]}" --argjson success "$SUCCESS" --argjson failed "$FAIL" '{dryRun:false,count:$total,success:$success,failed:$failed,results:.}' "$RESULT_FILE"
+else
+  echo
+  echo "${CYAN}Done:${NC} ${GREEN}${SUCCESS} updated${NC}$( [[ $FAIL -gt 0 ]] && echo ", ${RED}${FAIL} failed${NC}" )"
+fi
 exit $([[ $FAIL -gt 0 ]] && echo 1 || echo 0)

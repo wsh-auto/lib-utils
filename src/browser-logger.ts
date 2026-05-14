@@ -12,6 +12,7 @@
  * - Never exits fatally (browsers can't exit)
  */
 
+/** Browser-safe logger contract matching the Node logger wrapper surface. */
 interface Logger {
   critical(message: string, fields?: Record<string, unknown>): void;
   debug(message: string, fields?: Record<string, unknown>): void;
@@ -24,24 +25,25 @@ interface Logger {
   flush(): Promise<void>;
 }
 
+/** Factory signature exposed by lib-log and the local console stub. */
 type CreateLoggerFn = (name: string) => Logger;
 
 /** Create a console-based stub logger */
 function _createStubLogger(name: string, parentFields: Record<string, unknown> = {}): Logger {
-  const format = (level: string, message: string, fields?: Record<string, unknown>) => {
+  const _format = (level: string, message: string, fields?: Record<string, unknown>) => {
     const allFields = { ...parentFields, ...fields };
     const fieldsStr = Object.keys(allFields).length > 0 ? ` ${JSON.stringify(allFields)}` : '';
     return `${level} - [${name}] ${message}${fieldsStr}`;
   };
 
   return {
-    critical: (msg, fields) => console.error(format('critical', msg, fields)),
-    debug: (msg, fields) => console.debug(format('debug', msg, fields)),
-    info: (msg, fields) => console.info(format('info', msg, fields)),
-    warn: (msg, fields) => console.warn(format('warn', msg, fields)),
-    error: (msg, fields) => console.error(format('error', msg, fields)),
+    critical: (msg, fields) => console.error(_format('critical', msg, fields)),
+    debug: (msg, fields) => console.debug(_format('debug', msg, fields)),
+    info: (msg, fields) => console.info(_format('info', msg, fields)),
+    warn: (msg, fields) => console.warn(_format('warn', msg, fields)),
+    error: (msg, fields) => console.error(_format('error', msg, fields)),
     telemetry: () => {},
-    trace: (msg, fields) => console.debug(format('trace', msg, fields)),
+    trace: (msg, fields) => console.debug(_format('trace', msg, fields)),
     child: (fields) => _createStubLogger(name, { ...parentFields, ...fields }),
     flush: async () => {},
   };

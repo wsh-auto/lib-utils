@@ -1,7 +1,7 @@
 ---
 name: lib-utils
 description: >-
-  CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup.
+  CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup.
 hackmd: https://hackmd.io/8G_ZmEAtRpeNDgZbLlcJrA
 ---
 # lib-utils

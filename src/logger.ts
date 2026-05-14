@@ -10,6 +10,7 @@
 
 import { isOptionalDepMissing } from './optional-dep.js';
 
+/** Logger contract exposed by lib-log and the CI stub. */
 interface Logger {
   critical(message: string, fields?: Record<string, unknown>): void;
   debug(message: string, fields?: Record<string, unknown>): void;
@@ -22,25 +23,25 @@ interface Logger {
   flush(): Promise<void>;
 }
 
-// Type matches lib-log's createLogger signature
+/** Type matching lib-log's createLogger signature. */
 type CreateLoggerFn = (name: string) => Logger;
 
 /** Create a console-based stub logger for CI environments */
 function _createStubLogger(name: string, parentFields: Record<string, unknown> = {}): Logger {
-  const format = (level: string, message: string, fields?: Record<string, unknown>) => {
+  const _format = (level: string, message: string, fields?: Record<string, unknown>) => {
     const allFields = { ...parentFields, ...fields };
     const fieldsStr = Object.keys(allFields).length > 0 ? ` ${JSON.stringify(allFields)}` : '';
     return `${level} - [${name}] ${message}${fieldsStr}`;
   };
 
   return {
-    critical: (msg, fields) => console.error(format('critical', msg, fields)),
-    debug: (msg, fields) => console.log(format('debug', msg, fields)),
-    info: (msg, fields) => console.log(format('info', msg, fields)),
-    warn: (msg, fields) => console.warn(format('warn', msg, fields)),
-    error: (msg, fields) => console.error(format('error', msg, fields)),
+    critical: (msg, fields) => console.error(_format('critical', msg, fields)),
+    debug: (msg, fields) => console.log(_format('debug', msg, fields)),
+    info: (msg, fields) => console.log(_format('info', msg, fields)),
+    warn: (msg, fields) => console.warn(_format('warn', msg, fields)),
+    error: (msg, fields) => console.error(_format('error', msg, fields)),
     telemetry: () => {},
-    trace: (msg, fields) => console.debug(format('trace', msg, fields)),
+    trace: (msg, fields) => console.debug(_format('trace', msg, fields)),
     child: (fields) => _createStubLogger(name, { ...parentFields, ...fields }),
     flush: async () => {},
   };
@@ -112,15 +113,15 @@ export async function shutdown(): Promise<void> {
   if (!process.stdout.destroyed && !process.stdout.writableEnded) {
     while (process.stdout.writableNeedDrain) {
       await new Promise<void>(resolve => {
-        const done = () => {
-          process.stdout.off('drain', done);
-          process.stdout.off('error', done);
-          process.stdout.off('close', done);
+        const _done = () => {
+          process.stdout.off('drain', _done);
+          process.stdout.off('error', _done);
+          process.stdout.off('close', _done);
           resolve();
         };
-        process.stdout.once('drain', done);
-        process.stdout.once('error', done);
-        process.stdout.once('close', done);
+        process.stdout.once('drain', _done);
+        process.stdout.once('error', _done);
+        process.stdout.once('close', _done);
       });
       if (process.stdout.destroyed || process.stdout.writableEnded) return;
     }

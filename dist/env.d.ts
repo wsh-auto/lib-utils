@@ -8,7 +8,7 @@
  * - Missing dep outside CI: fatal error (forces proper setup)
  */
 import type { DotenvConfigOutput } from 'dotenv';
-/** Logger interface - console and lib-log Logger both satisfy this */
+/** Logger interface - console and lib-log Logger both satisfy this. */
 interface Log {
     info(msg: string, ...args: unknown[]): void;
     error(msg: string, ...args: unknown[]): void;
@@ -17,10 +17,10 @@ interface Log {
  * Initialize environment from .env.template using 1Password CLI.
  * Safe to use in CI environments where lib-1password may not be installed.
  *
- * @param projectRoot - Directory containing .env.template and .env
+ * @param callerDir - Any dir inside the package; pass `import.meta.dirname`
  * @param skipIfEnvVars - Skip injection if ALL these env vars are already set
  * @param log - Logger with info/error methods (defaults to console)
  * @returns { parsed: Record<string, string> } - The loaded/skipped env vars
  */
-export declare function initEnv(projectRoot: string, skipIfEnvVars?: string[], log?: Log): DotenvConfigOutput;
+export declare function initEnv(callerDir: string, skipIfEnvVars?: string[], log?: Log): DotenvConfigOutput;
 export {};

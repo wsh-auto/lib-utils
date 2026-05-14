@@ -11,6 +11,7 @@
  * - Uses lazy initialization (no top-level await for browser compatibility)
  * - Never exits fatally (browsers can't exit)
  */
+/** Browser-safe logger contract matching the Node logger wrapper surface. */
 interface Logger {
     critical(message: string, fields?: Record<string, unknown>): void;
     debug(message: string, fields?: Record<string, unknown>): void;
