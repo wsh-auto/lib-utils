@@ -12,8 +12,6 @@ PRIMARY: SKILL.md (4k) - How to use; self-contained
 ## Other Documentation
 - @CONTRIBUTING.md (600) - How to develop/maintain
 - @package.json (500) - Dependencies, scripts, project metadata
-- @anima/memory/DREAM.md (200) - Aggregated agent memory ($anima-memory)
-- @anima/memory/PENDING.md (200) - Uncurated diary entries since last dream curation ($anima-memory)
 
 All other files below are supporting context from dependencies.
 
@@ -814,7 +812,7 @@ Validates TypeScript projects against `$mdr:dev-typescript` best practices on to
 37. [ ] 🦖 vitest tests exercising `bun:ffi`/`bun:sqlite` shell out via `execSync("bun -e ...")` (banned `bun --bun vitest` — vitest+Bun FFI broken) — Per `$dev-typescript` "Exercising bun:ffi/bun:sqlite from Vitest Tests"
 38. [ ] 🦖 Test directory layout: `test/fixtures/` (read-only, shared) + `test/{unit,e2e}/tmp/` (gitignored ephemeral, full-clean teardown over partial) — Per `$dev-core/references/project-setup.md` "Testing Layout"
 39. [ ] 🦖 cli-table3 borderless config required for tabular CLI output (`NO_BORDER` constant pattern from `cli-tt/src/cli/utils.ts`); awareness of cli-table3 auto-sizing pitfall (column widths span whole table; manual `colSpan` inflates all columns) — Per `$dev-typescript` "CLI Table Output"; broader rule "use a table library, banned manual padEnd/padStart" lives in `$dev-core` "Table Output"
-40. [ ] 🦖 CLI table/list helpers imported from `@mdr/lib-list` (Tier 1: `NO_BORDER`, `truncateCell`, `formatLocalMinute`, `formatRelativeAge`, `stateColor`, `gaugeColor`, `stripAnsi`, `COLORS`); banned local duplicates of any Tier 1 helper. Regular rows×columns tables MAY opt into Tier 2 `renderList()`; multi-table/preview-interleaved/bespoke layouts keep direct `cli-table3` + Tier 1 helpers — Per `$dev-typescript` "CLI Table Output" › "Use `@mdr/lib-list` helpers; banned: local duplicates"
+40. [ ] 🦖 CLI table/list output follows every current `$mdr:lib-list/SKILL.md` best practice: Tier 1 helpers imported from `@mdr/lib-list` with no local duplicates; regular rows×columns tables use Tier 2 `renderList()` when it fits; every `renderList()` table has at least one sensible `flex: true` column and no low `truncate` cap that defeats flex width; datetime, sort order, `--limit`, filter footer, newline flattening, `…` truncation, terminal-width sizing, borderless spacing, row spacing, PuTTY-safe characters, shared output pipeline, and all six color layers match `$lib-list`; multi-table/preview-interleaved/bespoke layouts keep direct `cli-table3` + Tier 1 helpers only when `renderList()` does not fit — Per `$dev-typescript` "CLI Table Output" › "Use `@mdr/lib-list` helpers; banned: local duplicates" and `$mdr:lib-list/SKILL.md`
 41. [ ] 🦖 Dependency versions match the canonical rule in `$dev-typescript/references/project-setup.md` "`package.json`" (single source of truth — no template `package.json` exists) — Per `$dev-typescript/references/project-setup.md` "`package.json`"
 42. [ ] 🦖 `package.json` scripts include `start`/`stop`/`restart` that call `pmm` (when project ships a runtime daemon) — Per `$dev-typescript/references/project-setup.md` "`package.json`"
 
@@ -843,7 +841,7 @@ File: dev-typescript/SKILL.md
 ---
 name: dev-typescript
 description: >-
-  This skill should be used when working with TypeScript projects. Projects normally use Bun to run TypeScript directly, except Node-runtime consumers require compiled `dist/.js` exports. This skill MUST be loaded when working on TypeScript files (.ts, .tsx) or when the following keywords are encountered in conversation: "TypeScript", "TS".
+  This skill should be used when working with TypeScript projects. Projects normally use Bun to run TypeScript directly, except Node-runtime consumers require compiled `dist/.js` exports. Keywords: "TypeScript", "TS"
 requiredSkills:
   - mdr:dev-core
   - mdr:lib-utils
@@ -1307,6 +1305,7 @@ hackmd: https://hackmd.io/_00WTNIJSRWIEqWvBnFqEw
   - Skill Boundary == cwd Boundary == Agent Auto-Loaded Context; Split on Context Axis, Not Package Axis
 - YAML Metadata
   - name: and description:
+  - Keyword Quality (Banned Patterns)
   - host:
   - disable-model-invocation:
 - Bundled Resources Details
@@ -1411,7 +1410,16 @@ This boundary is **orthogonal to npm package boundary**. One npm package can cle
 ### name: and description:
 `name:`** and **`description:`** determine when Claude will use the skill. Be specific about what the skill does and when to use it. Use the third-person (e.g. "This skill should be used when..." instead of "Use this skill when..."). For description, use `>-` folded block scalar with content on a single line (never hard-wrap).
 
-For skills with distinctive trigger keywords, use this exact sentence in `description:`: `This skill MUST be loaded when the following case-insensitive keywords are encountered in conversation: "keyword1", "keyword2"`. Semantic equivalents fail `$mdr:audit-skill`.
+For skills with distinctive trigger keywords, end `description:` with this exact form: `Keywords: "keyword1", "keyword2"`. Agents MUST load the skill when any listed keyword appears case-insensitively in the user's prompt or the agent's own text, including status messages, planned commands, and tool-call arguments. Semantic equivalents fail `$mdr:audit-skill`.
+
+### Keyword Quality (Banned Patterns)
+Keywords in `description:` must trigger THIS skill, not others. Five anti-patterns are banned and enforced by `$mdr:audit-skill`:
+
+- **AP1 — Generic English words.** Drop keywords that would plausibly appear in conversation unrelated to this skill (e.g. `wf-validate` had `"APPROVE"`/`"REJECT"`; `app-rewind` had `"screen recording"`/`"audio recording"`).
+- **AP2 — Redundant case/suffix variants of the same root.** Matching is case-insensitive; collapse multi-casing or file/workflow suffixes to the canonical root (e.g. `help-opencode`'s `"OpenCode"`/`"opencode"`/`"opencode CLI"`/`"opencode config"`/`"opencode.json"`/`"OpenCode workflows"` → just `"opencode"`).
+- **AP3 — Names of other shipped skills.** Drop keywords that ARE another skill's canonical identifier — they mis-route loads (e.g. `audit-www` had `"www-amazon"`/`"www-tablecheck"`/`"www-wework"`, which belong to those skills).
+- **AP4 — Self-name and slash-form triggers.** Drop the skill's own name and `/`+name — the harness auto-routes them (e.g. `wf-context` had `"wf-context"`/`"/wf-context"`).
+- **AP5 — Trailing prose after the keyword list.** `Keywords:` must terminate the description; move any prose context before, not after (e.g. `chat-telegram` had prose continuing after `"tgd".` mid-description).
 
 ### host:
 **`host:`** - Specify when a skill must run on a specific machine (e.g., browser automation, apps only installed there):
@@ -1486,8 +1494,6 @@ For documentation style rules (DRY, structure, succinctness), see `$interface-sy
 ### 3. Generate CLAUDE.md
 Use `rp init` to generate CLAUDE.md then use `rp add` to edit its `requiredSkills` and `requiredFiles`.
 
-**Bidirectional requiredSkills rule:** If skill A imports skill B (TS `package.json` dependency), both must list each other in `requiredSkills`. A needs B's API docs; B needs to know its consumers. Claude Code handles circular resolution.
-
 See `$cli-repomix` for more details.
 
 ### 4. Validation Workflow
@@ -1517,6 +1523,7 @@ Syncs skill resources to central locations:
 - **Scripts** (`scripts/*`) → `~/mnt/.bin/`
 - **Commands** (`commands/*.md`) → `~/mnt/mdr/commands/`
 - **Workflows** (`commands/N-*.md`) → `~/mnt/mdr/commands/workflows/`
+- Cleanup must only remove same-name symlinks in `~/mnt/.bin` that resolve into a skill's own `scripts/` directory. Preserve intentional aliases and any link whose target is outside `skills/*/scripts/`.
 
 Files in `commands/` starting with `digit-` (e.g., `5-email-triage.md`) route to workflows; others route to commands.
 
