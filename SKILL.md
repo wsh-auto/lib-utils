@@ -2,7 +2,7 @@
 name: lib-utils
 description: >-
   CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup.
-hackmd: https://hackmd.io/8G_ZmEAtRpeNDgZbLlcJrA
+hackmd: https://hackmd.io/BTKKST7BQE6IF5e5ltPECQ
 ---
 # lib-utils
 
@@ -93,7 +93,7 @@ await log.flush();
 - Python usage (`from lib_log import create_logger`)
 - `deathWatch.measure(name, fn)` for daemon phase attribution; for the rollup recipe and worked example see `$dev-instrument` "Phase Attribution"
 - log.critical escalation (Telegram routing and agentic spawn via `chat-telegram`, 5min default cooldown)
-- Axiom schema (8 columns: `_time`, `level`, `message`, `project`, `env`, `hostname`, `context`, `error`)
+- Axiom schema (`_time`, `level`, `message`, `project`, `env`, `hostname`, `caller`, `binary`, `context`, `error`)
 - Token auto-load from `~/mnt/mdr/skills/lib-log/.env`; 3-token least-privilege split (ingest / frontend / query)
 - Logger naming: `{org}:{project}[:{subsystem}]` - name must match code location
 - Error objects: pass directly (any key name) → auto-serialized to `error` column with `name`/`message`/`stack`/`code`/`cause`
