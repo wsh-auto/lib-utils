@@ -30,6 +30,7 @@ type CreateLoggerFn = (name: string) => Logger;
 
 /** Create a console-based stub logger */
 function _createStubLogger(name: string, parentFields: Record<string, unknown> = {}): Logger {
+  /** Format one browser stub log line with inherited child fields. */
   const _format = (level: string, message: string, fields?: Record<string, unknown>) => {
     const allFields = { ...parentFields, ...fields };
     const fieldsStr = Object.keys(allFields).length > 0 ? ` ${JSON.stringify(allFields)}` : '';
@@ -54,6 +55,7 @@ function _createStubLogger(name: string, parentFields: Record<string, unknown> =
 let libLog: { createLogger: CreateLoggerFn } | null = null;
 let initPromise: Promise<void> | null = null;
 
+/** Lazily load lib-log once, falling back to the browser-safe stub. */
 async function _ensureInit(): Promise<void> {
   if (libLog) return;
   if (initPromise) return initPromise;

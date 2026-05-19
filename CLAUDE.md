@@ -10,21 +10,22 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (59.6k)
-## Documentation (5.1k)
+# lib-utils (61.1k)
+## Documentation (5.4k)
 - [@SKILL.md (4k)](https://hackmd.io/BTKKST7BQE6IF5e5ltPECQ)
-- @CONTRIBUTING.md (600)
+- @CONTRIBUTING.md (500)
 - @package.json (500)
+- @anima/memory/PENDING.md (300)
 
-## Code (4.5k)
-- @scripts/_LIB-UTILS_update-dependents (2.4k)
+## Code (4.7k)
+- @scripts/_LIB-UTILS_update-dependents (2.6k)
 - @src/env.ts (700)
 - @src/logger.ts (1.4k)
 
-## requiredSkills (50k)
+## requiredSkills (51k)
 - [@../dev-typescript/SKILL.md (7k)](https://hackmd.io/GHeNbSgET7-h5JZtOxFSnQ)
   - [@../dev-typescript/audit/checklist.md (4k)](https://hackmd.io/JlOt5ab6SoCwoNk8kYLX_g)
-  - [@../dev-core/SKILL.md (15k)](https://hackmd.io/WJLdXgBGT-uZbR0JB1wFcA)
+  - [@../dev-core/SKILL.md (16k)](https://hackmd.io/WJLdXgBGT-uZbR0JB1wFcA)
     - [@../dev-core/audit/checklist.md (3k)](https://hackmd.io/u_ZWdh9gTCG1WvFiBveCxA)
   - [@SKILL.md (4k)](https://hackmd.io/BTKKST7BQE6IF5e5ltPECQ)
 - @../lib-1password/SKILL.md (2k)

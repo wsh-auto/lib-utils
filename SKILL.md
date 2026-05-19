@@ -1,11 +1,10 @@
 ---
 name: lib-utils
 description: >-
-  CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup.
+  CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup. Keywords: "@mdr/lib-utils", "_LIB-UTILS_update-dependents", "bunWrite", "execWithLog", "critical-guard", "Axiom", "1Password"
 hackmd: https://hackmd.io/BTKKST7BQE6IF5e5ltPECQ
 ---
 # lib-utils
-
 Utilities that enhance development but gracefully degrade in CI environments.
 
 | Import Path | Optional Dep | With Dep | Without Dep (CI) | Without Dep (not CI) |
@@ -30,7 +29,6 @@ Utilities that enhance development but gracefully degrade in CI environments.
 - Scripts
 
 ## Installation
-
 ```bash
 bun add github:wsh-auto/lib-utils
 ```
@@ -61,7 +59,6 @@ Add `.env` to `.gitignore` - it's generated with real values at runtime.
 
 ## lib-log / Logging
 ### logger.ts - createLogger(project-name)
-
 ```typescript
 import { createLogger } from '@mdr/lib-utils/logger';
 
@@ -141,7 +138,6 @@ log.debug('thing happened', { field1, field2 });
 The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `LOG_LEVEL=debug` via `overmind.env`. All levels still ship to Axiom.
 
 ### Browser - createLogger(project-name)
-
 For frontend/browser environments (e.g., React apps bundled with Vite):
 
 ```typescript
@@ -158,7 +154,6 @@ log.info('Page loaded');
 - Current runtime is console-only even when `lib-log` is available; browser -> Axiom shipping is planned, not implemented
 
 ### Querying Logs: `ax` CLI
-
 **Naming convention:** Logger name = folder name. If you're in `cli-tt/`, logs are at `--project cli-tt` (auto-catches subsystems like `cli-tt:daemon`, `cli-tt:pool`).
 
 ```bash
@@ -181,7 +176,6 @@ ax --all-hosts              # Logs from every machine (default: caller hostname 
 See `$mdr:lib-log` for full ax documentation including APL passthrough.
 
 ## helpers / bunWrite()
-
 ```typescript
 import { bunWrite } from '@mdr/lib-utils/helpers';
 
@@ -197,7 +191,6 @@ Use `bunWrite()` for any CLI `--json` branch (or other large stdout/stderr emit)
 - Under-the-hood mechanism, refuted alternatives, and the original investigation are documented in `~/mnt/plans/tidy-weaving-hellman.md` (`hackmd: g5bQPS4yT0yMooinFuJLNQ`).
 
 ## helpers / execWithLog()
-
 ```typescript
 import { execWithLog } from '@mdr/lib-utils/helpers';
 
@@ -222,7 +215,6 @@ Import `critGuardCli`, `critGuardDaemonLoop`, and sentinel helpers from `@mdr/li
 - Daemon shutdown stays one-line: `await shutdown()` from `@mdr/lib-utils/logger` drains both Axiom and death-watch.
 
 ## lib-1password / env.ts - initEnv(callerDir, skipIfEnvVars?, log?)
-
 ```typescript
 import { initEnv } from '@mdr/lib-utils/env';
 

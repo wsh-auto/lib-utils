@@ -28,6 +28,7 @@ type CreateLoggerFn = (name: string) => Logger;
 
 /** Create a console-based stub logger for CI environments */
 function _createStubLogger(name: string, parentFields: Record<string, unknown> = {}): Logger {
+  /** Format one stub log line with inherited child fields. */
   const _format = (level: string, message: string, fields?: Record<string, unknown>) => {
     const allFields = { ...parentFields, ...fields };
     const fieldsStr = Object.keys(allFields).length > 0 ? ` ${JSON.stringify(allFields)}` : '';

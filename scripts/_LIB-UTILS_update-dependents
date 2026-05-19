@@ -3,6 +3,9 @@
 
 set -uo pipefail  # Removed -e to not exit on errors
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+
 CYAN=$'\x1b[1m\x1b[36m'
 YELLOW=$'\x1b[33m'
 GREEN=$'\x1b[32m'
@@ -93,6 +96,21 @@ if $JSON; then
   command -v jq >/dev/null 2>&1 || usage_error "Required tool not in PATH for --json: jq"
 fi
 
+log_invocation() {
+  command -v bun >/dev/null 2>&1 || return 0
+  (
+    cd "$ROOT_DIR" || exit 0
+    bun --silent --eval '
+      import { createLogger, shutdown } from "./src/logger.ts";
+      const log = createLogger("mdr:lib-utils:update-dependents");
+      log.debug("CLI invoked", { argv: process.env.LIB_UTILS_ARGV?.split("\n").filter(Boolean) ?? [] });
+      await shutdown();
+    '
+  ) >/dev/null 2>&1 || true
+}
+
+LIB_UTILS_ARGV="$(printf '%s\n' "$@")" log_invocation
+
 # Bootstrap bun link registrations across the monorepo.
 # Discovers every link:@scope/name reference in non-vendored package.json files,
 # locates each source dir (the package.json declaring "name": "<pkg>"), and
@@ -164,13 +182,19 @@ bootstrap_links() {
   echo
 }
 
+LINK_BOOTSTRAP_OK=true
 if ! $SKIP_LINKS; then
   if $JSON; then
-    bootstrap_links >/dev/null
+    bootstrap_links >/dev/null || LINK_BOOTSTRAP_OK=false
   else
-    bootstrap_links
+    bootstrap_links || LINK_BOOTSTRAP_OK=false
   fi
-  if $LINKS_ONLY; then exit 0; fi
+  if $LINKS_ONLY; then
+    if $JSON; then
+      jq -cn --argjson ok "$LINK_BOOTSTRAP_OK" '{linksOnly:true,ok:$ok}'
+    fi
+    $LINK_BOOTSTRAP_OK && exit 0 || exit 1
+  fi
 fi
 
 if ! $JSON; then
