@@ -96,31 +96,30 @@ Validates ALL projects (TypeScript, Python, bash, mixed) against `$mdr:dev-core`
 9. [ ] ⚙️ Bash scripts using modern features (`declare -A`, `${var^^}`, `mapfile`/`readarray`, `[[ -v var ]]`, `**` globstar) shebang `#!/usr/bin/env bash`; banned `#!/bin/bash` for these features (macOS `/bin/bash` is bash 3.2.57) — Per `$dev-core` "Bash Scripts"
 10. [ ] ⚙️ Tests do NOT write under live session roots, durable registries, or daemon-watched directories: banned `~/mnt/data/*` registries unless redirected to a temp root, `~/.claude/`, `~/.codex/`, `~/.gemini/`, `~/mnt/config/claude/projects/`, another repo's `anima/memory/`, any `pmm`-managed runtime state; use `/tmp/{project}/{purpose}/` or per-test temp dirs — Per `$dev-core` "Scratch Paths"
 11. [ ] ⚙️ CLIs whose output an agent might parse and pipe (queries, listings, registry reads, status snapshots) support `--json`; generators/mutators/editors do not expose `--json` just to wrap payloads or status. When `--json` (or another agent-safe mode like `--markdown`/`--csv`) is offered: all output modes render from one shared structured result via a single parse/filter/limit pipeline (mode dispatch only at the final renderer), AND the CLI runs agent-context detection (`CLAUDECODE`/`CODEX_SANDBOX`/`CODEX_THREAD_ID`/`GEMINI_CLI`) before output-mode early return, refusing only when no agent-safe mode is selected. Human-only diagnostic commands without any machine-output mode are NOT required to refuse in agent context — Per `$dev-core` "--json Support" + "Agent Context Detection"
-12. [ ] ⚙️ Every script emits at least one lib-log call on invocation so Axiom is the usage oracle; follow `$lib-log` "CLI Logging Policy" (`log.debug` for invocation logs, no logs at all for `--help`/`--version`, never log secrets). Bash wrappers that immediately `exec` into a TypeScript/Python entrypoint inherit coverage from the wrapped entrypoint; standalone bash scripts must emit through the shell helper if available, with a narrow exception only for truly transient scripts. — Per `$lib-log` "CLI Logging Policy"
-13. [ ] ⚙️ Review-only process policies are explicitly checked during audit closeout: no tax-without-refund abstractions, no sibling fallback branches before RCA, refactored code either fixes or tracks carried-forward bugs, mutable test expectations are derived from source of truth, board items cite reproducible evidence, public contract changes include example-surface validation, and final saved artifacts/scripts are re-read or smoked before approval. — Per `$dev-core` "Refactor Discipline" and "Testing"
-14. [ ] ⚙️ `test:unit` suites are hermetic and parallel-safe: no test under `test/unit/` binds a fixed port, calls `.listen()`/`.start()` on a real server/daemon, attaches a real tmux control server, spawns real `tmux`/agent subprocesses, or writes non-isolated shared paths (`/tmp/tt/...` session space, real registries, daemon-watched dirs). Resource-touching "unit" tests are mocked into true hermetic units OR relocated to `test:e2e` per `$dev-test` "Test Script Naming Standard"; a per-run-unique resource (`listen(0)` ephemeral port, `mkdtemp` dir, unique socket name) qualifies for `test:unit` only when no host-wide cap is exhausted at concurrency-30. — Per `$dev-core` "Unit Tests Must Be Hermetic and Parallel-Safe; Banned: Shared Singletons in `test:unit`"
+12. [ ] ⚙️ Review-only process policies are explicitly checked during audit closeout: no tax-without-refund abstractions, no sibling fallback branches before RCA, refactored code either fixes or tracks carried-forward bugs, mutable test expectations are derived from source of truth, board items cite reproducible evidence, public contract changes include example-surface validation, and final saved artifacts/scripts are re-read or smoked before approval. — Per `$dev-core` "Refactor Discipline" and "Testing"
+13. [ ] ⚙️ `test:unit` suites are hermetic and parallel-safe: no test under `test/unit/` binds a fixed port, calls `.listen()`/`.start()` on a real server/daemon, attaches a real tmux control server, spawns real `tmux`/agent subprocesses, or writes non-isolated shared paths (`/tmp/tt/...` session space, real registries, daemon-watched dirs). Resource-touching "unit" tests are mocked into true hermetic units OR relocated to `test:e2e` per `$dev-test` "Test Script Naming Standard"; a per-run-unique resource (`listen(0)` ephemeral port, `mkdtemp` dir, unique socket name) qualifies for `test:unit` only when no host-wide cap is exhausted at concurrency-30. — Per `$dev-core` "Unit Tests Must Be Hermetic and Parallel-Safe; Banned: Shared Singletons in `test:unit`"
 
 ## P2 - BEST PRACTICES
-15. [ ] ⚙️ Public stream APIs use `*Emitter` (signature: `(...args) => AsyncIterable<T>`), `*Pipe` (signature: `(input: AsyncIterable<T>, ...) => AsyncIterable<U>`), `*Sink` (signature: `(input: AsyncIterable<T>, ...) => Promise<R>`); banned suffix misuse on non-stream functions (e.g., `tokenEmitter(): Promise<string>`) — Per `$dev-core` "Stream APIs"
-16. [ ] ⚙️ Public API naming signals failure semantics: `try*` normalizes (no throw on operational failure), `retry*` retries internally then throws on exhaustion, plain verbs (`read*`, `watch*`, `tail*`, `cmd*`, `set*`, `load*`, `get*`) throw on failure; banned non-throwing plain verbs that return `null`/`undefined`/`false` silently — Per `$dev-core` "Banned: Non-Throwing Plain Verb APIs"
-17. [ ] ⚙️ Time variables use `Ms` suffix (`timeoutMs`, `intervalMs`, `cooldownMs`, `retryDelayMs`); banned bare `timeout`, `interval`, `delay`, `cooldown`, `grace` in variable/config names — Per `$dev-core` "Time Variables"
-18. [ ] ⚙️ Source layout: flat `src/` for single-surface projects (lib OR cli OR daemon); `src/{lib,cli,daemon,...}/` for multi-surface with `"main": "src/lib/index.ts"`; banned half-converted layouts when adding a second surface — Per `$dev-core/references/project-setup.md` "Source Layout"
-19. [ ] ⚙️ Shared/tunable constants extracted to `assets/config.yml` when used in 2+ files OR varying by environment OR frequently tuned; typed `config.{ts,py}` loader fails fast on missing required fields; no `DEFAULT_*` mirroring of shipped values; `assets/config.yml` listed in CLAUDE.md `requiredFiles`; YAML parsed via `yaml` (TypeScript) or `yaml.safe_load` (Python), never hand-rolled (breaks on comments, multi-line strings, anchors) — Per `$dev-core` "Config Files" + "YAML Parsing"
-20. [ ] ⚙️ `.gitignore` aligned with canonical (`$dev-typescript/assets/templates/.gitignore` or repo-root canonical); subpackage `.gitignore` files keep only unique patterns; banned inline `# comment` on same line as pattern (parsed as literal pattern) — Per `$dev-core/references/project-setup.md` "Gitignore Policy"
-21. [ ] ⚙️ CLI table output uses a proper table library: `cli-table3` (TypeScript), `rich`/`tabulate` (Python), `column -t` (bash); banned manual `padEnd`/`padStart` (breaks with ANSI colors and CJK chars) — Per `$dev-core` "Table Output"
-22. [ ] ⚙️ CLI misuse and operational error paths end with one literal recovery hint line: `Hint: <command>` showing the exact next retry — Per `$dev-core` "CLI Error Recovery Hints"
-23. [ ] ⚙️ Test directory layout: `test/fixtures/` (read-only, shared across unit/e2e) + `test/{unit,e2e}/tmp/` (gitignored ephemeral); template-based fixture pattern when tests modify files; full `tmp/` cleanup over partial — Per `$dev-core/references/project-setup.md` "Testing Layout"
-24. [ ] ⚙️ Projects with durable runtime state place it under `${XDG_STATE_HOME:-$HOME/.local/state}/<project>/` or a project-specific override; `/tmp` only for reboot-bounded high-churn signals. Skip if project has no durable runtime state. — Per `$dev-core` "Runtime State" and "Scratch Paths"
-25. [ ] ⚙️ Trust-contract invariants encoded as `log.critical` tripwires with `reproducer` + `relevantFiles` payload (parser non-empty, conservation laws, state-machine transitions, decoded-path round-trip, exactly-one-owner cardinality); banned downgrade to warn or silent fallback. *Semantic-review item: auditor greps for `log.critical` sites and checks payload shape.* — Per `$dev-core` "Encode Trust Contracts as Invariant Tripwires"
+14. [ ] ⚙️ Public stream APIs use `*Emitter` (signature: `(...args) => AsyncIterable<T>`), `*Pipe` (signature: `(input: AsyncIterable<T>, ...) => AsyncIterable<U>`), `*Sink` (signature: `(input: AsyncIterable<T>, ...) => Promise<R>`); banned suffix misuse on non-stream functions (e.g., `tokenEmitter(): Promise<string>`) — Per `$dev-core` "Stream APIs"
+15. [ ] ⚙️ Public API naming signals failure semantics: `try*` normalizes (no throw on operational failure), `retry*` retries internally then throws on exhaustion, plain verbs (`read*`, `watch*`, `tail*`, `cmd*`, `set*`, `load*`, `get*`) throw on failure; banned non-throwing plain verbs that return `null`/`undefined`/`false` silently — Per `$dev-core` "Banned: Non-Throwing Plain Verb APIs"
+16. [ ] ⚙️ Time variables use `Ms` suffix (`timeoutMs`, `intervalMs`, `cooldownMs`, `retryDelayMs`); banned bare `timeout`, `interval`, `delay`, `cooldown`, `grace` in variable/config names — Per `$dev-core` "Time Variables"
+17. [ ] ⚙️ Source layout: flat `src/` for single-surface projects (lib OR cli OR daemon); `src/{lib,cli,daemon,...}/` for multi-surface with `"main": "src/lib/index.ts"`; banned half-converted layouts when adding a second surface — Per `$dev-core/references/project-setup.md` "Source Layout"
+18. [ ] ⚙️ Shared/tunable constants extracted to `assets/config.yml` when used in 2+ files OR varying by environment OR frequently tuned; typed `config.{ts,py}` loader fails fast on missing required fields; no `DEFAULT_*` mirroring of shipped values; `assets/config.yml` listed in CLAUDE.md `requiredFiles`; YAML parsed via `yaml` (TypeScript) or `yaml.safe_load` (Python), never hand-rolled (breaks on comments, multi-line strings, anchors) — Per `$dev-core` "Config Files" + "YAML Parsing"
+19. [ ] ⚙️ `.gitignore` aligned with canonical (`$dev-typescript/assets/templates/.gitignore` or repo-root canonical); subpackage `.gitignore` files keep only unique patterns; banned inline `# comment` on same line as pattern (parsed as literal pattern) — Per `$dev-core/references/project-setup.md` "Gitignore Policy"
+20. [ ] ⚙️ CLI table output uses a proper table library: `cli-table3` (TypeScript), `rich`/`tabulate` (Python), `column -t` (bash); banned manual `padEnd`/`padStart` (breaks with ANSI colors and CJK chars) — Per `$dev-core` "Table Output"
+21. [ ] ⚙️ CLI misuse and operational error paths end with one literal recovery hint line: `Hint: <command>` showing the exact next retry — Per `$dev-core` "CLI Error Recovery Hints"
+22. [ ] ⚙️ Test directory layout: `test/fixtures/` (read-only, shared across unit/e2e) + `test/{unit,e2e}/tmp/` (gitignored ephemeral); template-based fixture pattern when tests modify files; full `tmp/` cleanup over partial — Per `$dev-core/references/project-setup.md` "Testing Layout"
+23. [ ] ⚙️ Projects with durable runtime state place it under `${XDG_STATE_HOME:-$HOME/.local/state}/<project>/` or a project-specific override; `/tmp` only for reboot-bounded high-churn signals. Skip if project has no durable runtime state. — Per `$dev-core` "Runtime State" and "Scratch Paths"
+24. [ ] ⚙️ Trust-contract invariants encoded as `log.critical` tripwires with `reproducer` + `relevantFiles` payload (parser non-empty, conservation laws, state-machine transitions, decoded-path round-trip, exactly-one-owner cardinality); banned downgrade to warn or silent fallback. *Semantic-review item: auditor greps for `log.critical` sites and checks payload shape.* — Per `$dev-core` "Encode Trust Contracts as Invariant Tripwires"
 
 ## P3 - OPTIONAL
-26. [ ] ⚙️ Internal helpers prefixed `_` (`_helper`, `def _helper`, bash `_helper()`); banned bare names for non-exported functions — Per `$dev-core` "Internal Functions"
-27. [ ] ⚙️ Lint suppressions banned: no `// eslint-disable`, `# noqa`, `# type: ignore`, `@ts-ignore` (fix root cause); `_unusedVar` only for intentionally unused (destructuring skips, required-but-unused params) — Per `$dev-core` "Lint Errors"
-28. [ ] ⚙️ Inline single-use variables when value used only once with no side effects; extract duplicated code (>3 lines) into `_` helpers; functions <50 lines — Per `$dev-core` "Code Style"
-29. [ ] ⚙️ Documentation contains no internal-tracker issue numbers (rot when tracker access lapses) and no manually-maintained counts (test counts, file counts). External GitHub PR/issue refs in lookbooks/research/analysis docs are fine — those URLs survive and provide real context. — Per `$dev-core` "Documentation"
-30. [ ] ⚙️ Git operations anchor at `git rev-parse --show-toplevel` (not `pwd` — nested repos can alias parent); use `core.quotepath=false` or NUL-delimited `-z` parsing for path round-trips — Per `$dev-core` "Git Operations"
-31. [ ] ⚙️ Generic name collision avoidance: constants/types named after protected work (`SETUP_TEARDOWN_TIMEOUT_MS`, `RELOAD_DEBOUNCE_MS`), not runner mechanism (`HOOK_*`, `EVENT_*`); grep monorepo before committing overloaded nouns. *Semantic-review item: auditor greps the noun across the workspace.* — Per `$dev-core` "Banned: Generic Names"
-32. [ ] ⚙️ Banned destructive git commands in source/scripts: `git reset --hard`, `git checkout -- .`, `git restore`, bulk `git checkout HEAD -- *`. (Demoted P1 → P3 in v1.1.0: source-code hits are rare; this is mostly an agent-runtime concern enforced by `$interface-system`.) — Per `$dev-core` "Banned: Destructive Git Reverts"
+25. [ ] ⚙️ Internal helpers prefixed `_` (`_helper`, `def _helper`, bash `_helper()`); banned bare names for non-exported functions — Per `$dev-core` "Internal Functions"
+26. [ ] ⚙️ Lint suppressions banned: no `// eslint-disable`, `# noqa`, `# type: ignore`, `@ts-ignore` (fix root cause); `_unusedVar` only for intentionally unused (destructuring skips, required-but-unused params) — Per `$dev-core` "Lint Errors"
+27. [ ] ⚙️ Inline single-use variables when value used only once with no side effects; extract duplicated code (>3 lines) into `_` helpers; functions <50 lines — Per `$dev-core` "Code Style"
+28. [ ] ⚙️ Documentation contains no internal-tracker issue numbers (rot when tracker access lapses) and no manually-maintained counts (test counts, file counts). External GitHub PR/issue refs in lookbooks/research/analysis docs are fine — those URLs survive and provide real context. — Per `$dev-core` "Documentation"
+29. [ ] ⚙️ Git operations anchor at `git rev-parse --show-toplevel` (not `pwd` — nested repos can alias parent); use `core.quotepath=false` or NUL-delimited `-z` parsing for path round-trips — Per `$dev-core` "Git Operations"
+30. [ ] ⚙️ Generic name collision avoidance: constants/types named after protected work (`SETUP_TEARDOWN_TIMEOUT_MS`, `RELOAD_DEBOUNCE_MS`), not runner mechanism (`HOOK_*`, `EVENT_*`); grep monorepo before committing overloaded nouns. *Semantic-review item: auditor greps the noun across the workspace.* — Per `$dev-core` "Banned: Generic Names"
+31. [ ] ⚙️ Banned destructive git commands in source/scripts: `git reset --hard`, `git checkout -- .`, `git restore`, bulk `git checkout HEAD -- *`. (Demoted P1 → P3 in v1.1.0: source-code hits are rare; this is mostly an agent-runtime concern enforced by `$interface-system`.) — Per `$dev-core` "Banned: Destructive Git Reverts"
 
 ================
 File: dev-core/SKILL.md
@@ -128,7 +127,7 @@ File: dev-core/SKILL.md
 ---
 name: dev-core
 description: >-
-  This skill should be used as a dependency by language-specific dev-* skills. Contains cross-language development patterns for code conventions, CLI design, testing, and documentation. Do not load directly - load dev-typescript or dev-python instead.
+  This skill should be used as a dependency by language-specific dev-* skills. Contains cross-language development patterns for code conventions, CLI design, testing, and documentation. Do not load directly - load dev-typescript or dev-python instead. Keywords: "dev-*", "red-green-refactor", "hermetic unit tests", "public API naming", "single-exit CLIs"
 requiredFiles:
   - audit/checklist.md
 hackmd: https://hackmd.io/WJLdXgBGT-uZbR0JB1wFcA
@@ -370,10 +369,10 @@ Hand-rolled parsers break on comments, multi-line strings, and anchors.
 ### Layered Configuration: Use `deepMerge` + Source-List Ordering; Banned: Per-Field Precedence Rules
 When multiple sources contribute to the same record (model, route, config), fold them through `deepMerge` across an ordered source-list. **Last-in-stack wins. Precedence lives in list order, never in field names.**
 
-```typescript
+`````typescript!
 const sources: Array<Partial<Registry>> = [pluginA.get(), enrichmentB.get(), operatorConfig];
 const merged = sources.reduce((acc, slice) => deepMerge(acc, slice), {});
-```
+`````
 
 Every layer returns the same `Partial<Registry>` shape. `deepMerge` skips undefined, so layers safely leave fields blank.
 
@@ -551,7 +550,7 @@ Scripts that emit markdown SHOULD support `--markdown` for the same content as t
 
 ### Agent Context Detection
 Applies only to scripts that already provide `--json` or another agent-safe full-output mode (`--markdown`, `--csv`, etc.) — i.e. commands where agent consumption is a foreseen use case. Such scripts MUST run agent-context detection before any output-mode early return; in agent context, refuse only when no agent-safe output mode is selected. Human-only diagnostic commands without any machine-output mode are NOT required to refuse in agent context.
-```bash
+`````bash!
 # Bash pattern
 IS_AGENT="${CLAUDECODE:-}${CODEX_SANDBOX:-}${CODEX_THREAD_ID:-}${GEMINI_CLI:-}"
 AGENT_SAFE_OUTPUT="${JSON_FLAG:-}${MARKDOWN_FLAG:-}${CSV_FLAG:-}"
@@ -559,7 +558,7 @@ if [[ -n "$IS_AGENT" && -z "$AGENT_SAFE_OUTPUT" ]]; then
     echo "Error: Agent context detected but agent-safe output mode missing." >&2
     exit 2
 fi
-```
+`````
 
 ## CLI Development - Output & Errors
 ### Table Output: Use `cli-table3`/`rich`/`column -t`; Banned: Manual `padEnd`/`padStart`
@@ -580,7 +579,7 @@ CLIs importing `@mdr/lib-utils/logger` MUST use a single exit point with `shutdo
 For entry-point JS-class escalation, wrap `_main()` with `critGuardCli` from `@mdr/lib-utils/helpers/critical-guard`; structured `[EXIT/4]` / `[EXIT/5]` throws still flow to the single-exit catch.
 
 **Pattern:** `_main()` throws `[EXIT/4] message` for misuse and `[EXIT/5] message` for operational failures; caller uses try/catch/finally with `shutdown()` in finally. Unstructured throws are bugs: log them with `log.error()` and exit `99`.
-```typescript
+`````typescript!
 async function _main(): Promise<void> {
   if (!valid) throw new Error(`[EXIT/4] Invalid input: ${input}`);
   if (!connected) throw new Error(`[EXIT/5] Connection failed`);
@@ -597,7 +596,7 @@ catch (err) {
 }
 finally { await shutdown(); }
 process.exit(exitCode);
-```
+`````
 
 `shutdown()` drains stdout before returning, preventing Bun's `process.exit()` from truncating piped output >64KB.
 
@@ -664,7 +663,7 @@ Include spec ID in test name when `_TEST.md` exists:
 ## Testing - Honest Failure Handling
 ### BANNED: Hiding Flaky Test Failures
 NEVER wrap test logic in try-catch to hide failures:
-```
+`````typescript!
 # ❌ BANNED: Swallowing failures with fake success
 try { await riskyOperation() } catch { log.info('✓ Test passed') }
 
@@ -674,7 +673,7 @@ if (!exists) { log.info('✓ Test skipped'); return }
 # ❌ BANNED: Conditional success that always "passes"
 const worked = await something().catch(() => false)
 if (worked) { log.info('✓ Success') } else { log.info('✓ Attempted') }
-```
+`````
 
 **If a test is flaky, FIX THE ROOT CAUSE.** Wrapping in try-catch just hides bugs.
 
@@ -793,7 +792,7 @@ hackmd: https://hackmd.io/JlOt5ab6SoCwoNk8kYLX_g
 Validates TypeScript projects against `$mdr:dev-typescript` best practices on top of the universal `$mdr:dev-core/audit/checklist.md` floor. **Apply `$dev-core/audit` first** — items duplicated there (single-exit pattern, SIGTERM handlers, `_` prefix, lint suppression, daemon `?from=`, cli-table3 broad rule, etc.) have been removed from this checklist. This checklist focuses on TS / Bun / vitest specifics. Items grouped by priority; ordered to follow `$dev-typescript` SKILL.md TOC. Each item cites its source rule so future drift is detectable by grep.
 
 ## P0 - CRITICAL
-1. [ ] 🦖 Bun runs TypeScript directly from `src/` (no `dist/` compilation, no `npm run build`). **Exception:** packages exporting ESLint plugins or other Node-loaded library symbols (canonical example: `$mdr:dev-typescript` itself) MUST ship compiled `dist/` and point `exports` at `dist/.js`. — Per `$dev-typescript/references/project-setup.md` "Bun-Only Runtime" › "Exception: Library Packages with Node-Runtime Consumers"
+1. [ ] 🦖 Bun runs TypeScript directly from `src/` (no `dist/` compilation, no `npm run build`). **Exceptions:** packages exporting ESLint plugins or other Node-loaded library symbols (canonical example: `$mdr:dev-typescript` itself) MUST ship compiled `dist/` and point `exports` at `dist/.js`; browser frontend apps using Vite/Playwright MAY keep `build` scripts and build-dependent e2e gates when the shipped browser bundle is the proof surface. — Per `$dev-typescript/references/project-setup.md` "Bun-Only Runtime" › "Exception: Library Packages with Node-Runtime Consumers"
 2. [ ] 🦖 `package.json` has `"type": "module"` for ES Modules — Per `$dev-typescript/references/project-setup.md` "ES Modules"
 3. [ ] 🦖 CLI branches that may emit >64KB to stdout use `bunWrite()` from `@mdr/lib-utils/helpers`, never `console.log(JSON.stringify(...))` — Per `$dev-typescript/references/project-setup.md` "Bun-Only Runtime" and `$lib-utils` "bunWrite()"
 4. [ ] 🦖 "Definition of Done": `bun run test` was actually run before declaring complete; named gate (`test:e2e`/`test:all`) also run if specified by plan/SKILL.md — Per `$dev-typescript` "Definition of Done" and `$dev-core` "Banned: Declaring E2E Fixes Done Without Full Suite Green"
@@ -1312,11 +1311,12 @@ File: edit-skill/SKILL.md
 ---
 name: edit-skill
 description: >-
-  Guide for editing and creating Skills. This skill should be used when users want to edit an existing Skill or create a new Skill that extends agentic capabilities with specialized knowledge, workflows, or tool integrations. Keywords: "Claude Skills", "skill creation", "skill editing", "ccsync", "_EDIT-SKILL_package"
+  Guide for editing and creating Skills. This skill should be used when users want to edit an existing Skill or create a new Skill that extends agentic capabilities with specialized knowledge, workflows, or tool integrations. Keywords: "Claude Skills", "skill creation", "skill editing", "ccsync"
 source: ~/mnt/data/mirrors/openai/skills/skills/.system/skill-creator/
-hackmd: https://hackmd.io/_00WTNIJSRWIEqWvBnFqEw
+hackmd: https://hackmd.io/foCrga-3TuOxEwwlxgOrSg
 ---
 # Skill Editor and Builder
+
 ## TABLE OF CONTENTS
 - REQUIRED READING
   - If creating a New Skill
@@ -1357,8 +1357,7 @@ MUST Read `references/creating-new-skills.md`.
 2. Plan reusable resources
 3. Create skill directory with SKILL.md (use YAML template from "YAML Metadata" section)
 4. Edit the skill (see editing process above)
-5. Package skill (_EDIT-SKILL_package, globally available)
-6. Iterate
+5. Iterate
 
 ### If creating/editing a "query-" skill (API integration)
 MUST Read `references/special-instructions-use-skills.md`.
@@ -1470,7 +1469,7 @@ Executable code (Python/Bash/etc.) for tasks requiring deterministic reliability
 - **Benefits**: Token efficient, deterministic, may be executed without loading into context
 - **Naming conventions:**
   - User-facing: choose a short command name, use subcommand pattern for related scripts
-  - Agent-facing: `_SKILL-NAME_action` pattern (e.g., `_EDIT-SKILL_package`)
+  - Agent-facing: `_SKILL-NAME_action` pattern (e.g., `_MON-SKILLS_refresh-facets`)
     - Exception: pmm-managed daemon wrappers under `scripts/` use the service name directly (e.g., `scripts/srv-mdr`, `scripts/watchd`). The wrapper path IS the Procfile entry and the runtime service identity; see `$ops-pmm` "Procfile Entry Contract".
   - All scripts: Must support `--help`, have proper error handling, be executable with shebang
 - **src/+test/+scripts/ pattern**: Use when lots of shared logic OR importable API needed. Required for use-* and ops-* skills in TypeScript.
@@ -1545,7 +1544,6 @@ All scripts are globally available in `~/mnt/.bin/`:
 
 | Script | Purpose |
 |--------|---------|
-| `_EDIT-SKILL_package` | Create distributable zip file after validation |
 | `ccsync` | Sync all skill resources (scripts + commands) to their destinations |
 
 ### ccsync
@@ -1824,16 +1822,17 @@ See CONTRIBUTING.md for the full migration plan.
 File: lib-log/README.md
 ================
 ---
-hackmd: https://hackmd.io/A4-J5mShRJ-cuVwh7jiclg
+hackmd: https://hackmd.io/8nInNBtIR9WwJu0r9WwFHg
 ---
 # @mdr/lib-log
 
-Dual-output logging for TypeScript and Python: colored console + JSON to [Axiom](https://axiom.co) (1TB/month free tier).
+Dual-output logging for TypeScript and Python, plus standalone Bash invocation telemetry: colored console + JSON to [Axiom](https://axiom.co) (1TB/month free tier).
 
 ## TABLE OF CONTENTS
 - Usage
 - Installation
 - TypeScript Levels
+- Bash Helper
 - Public TypeScript Exports
 - Archive
 - Projects Using lib-log (via lib-utils)
@@ -1868,6 +1867,10 @@ import { createLogger } from '@mdr/lib-utils/logger';
 - `trace` - stderr only
 
 Python stays on `debug` / `info` / `warn` / `error`.
+
+## Bash Helper
+
+Standalone bash CLIs snapshot `LIBLOG_ORIGINAL_ARGS=("$@")` before parsing, then source `scripts/liblog.sh` and call `liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"` after `--help`/`--version` exits. It emits `CLI invoked` to Axiom through detached direct `curl` using `AXIOM_TOKEN`; bash wrappers that immediately `exec` into TypeScript/Python inherit coverage from the wrapped entrypoint.
 
 ## Public TypeScript Exports
 
@@ -2015,6 +2018,7 @@ Centralized logging using Axiom (1TB/month free). See @README.md for list of use
   - Metrics shape
   - Phase Attribution for Daemons
   - Alerting semantics
+  - Spike-Attribution Gate (CPU-Delta)
   - Deferred scope
 - Agent Guidelines
   - CLI Logging Policy
@@ -2025,6 +2029,7 @@ Centralized logging using Axiom (1TB/month free). See @README.md for list of use
 |----------|:-------:|:-----:|-------|
 | TypeScript (Node.js) | ✅ | ✅ | `AXIOM_TOKEN` (ingest-only) |
 | Python | ✅ | ✅ | `AXIOM_TOKEN` (ingest-only) |
+| Bash helper | - | ✅ | `AXIOM_TOKEN` (ingest-only) |
 | Frontend (browser) | ✅ | Planned | `AXIOM_TOKEN_FRONTEND` via `window.__WSH_CONFIG__` |
 | `ax` CLI | - | ✅ | `AXIOM_TOKEN_QUERY` (query-only) |
 
@@ -2617,7 +2622,30 @@ The `eventLoopP99Ms` critical passes through a fifth peer gate that distinguishe
 
 ## Agent Guidelines
 ### CLI Logging Policy
-Script entrypoints should emit one structured invocation log through `lib-log`; this is audit-enforced by `$mdr:dev-core/audit/checklist.md` item 14. Use `log.debug` for invocation logs, emit no logs at all for `--help`/`--version`, and never include secrets.
+Script entrypoints should emit one structured invocation log through `lib-log` so Axiom is the usage oracle; this is audit-enforced by `$mdr:audit-scripts` "Script Audit Checklist". The canonical line MUST be one of the first statements to run — at process entry, before any work, and never after work completes. The Axiom write is async fire-and-forget, so emitting it first gives it the entire CLI runtime to flush before `shutdown()` drains the rest; emitting it late shrinks that window and a fast-exiting CLI can drop the row:
+
+`````typescript!
+log.debug('CLI invoked');
+`````
+
+No fields are required: `argv` is auto-injected into `context.argv` on every call (Python `sys.argv[1:]`), and `caller` / `binary` / `project` / `env` / `hostname` are auto-detected — including the env-var-based caller classification (`CLAUDECODE`/`CODEX_SANDBOX`/`CODEX_THREAD_ID`/`GEMINI_CLI` → claude/codex/gemini, SSH env → ssh, TTY → human, else service) that the `$mdr:mon-skills` facets bucket on. Do NOT manually log env vars or secrets. The message string MUST be exactly `CLI invoked` — downstream consumers match `message == 'CLI invoked'` literally, so variants like `"cleanup CLI invoked"` are not counted. Use `log.debug` (not `info`), emit no logs at all for `--help`/`--version`. Bash wrappers that immediately `exec` into a TypeScript/Python entrypoint inherit coverage from the wrapped entrypoint; standalone bash scripts snapshot original args before parsing, then source `liblog.sh` and call `liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"`, with a narrow exception only for truly transient scripts.
+
+`````bash!
+LIBLOG_ORIGINAL_ARGS=("$@")
+_liblog="$HOME/mnt/mdr/skills/lib-log/scripts/liblog.sh"; [[ -r $_liblog ]] || _liblog="$(command -v liblog.sh 2>/dev/null)"
+[[ -n ${_liblog:-} && -r $_liblog ]] && { source "$_liblog"; liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"; } || true
+`````
+
+Standalone bash CLIs snapshot `LIBLOG_ORIGINAL_ARGS=("$@")` before argument parsing, then place the source/call preamble after `--help`/`--version` early exits and after strict-mode setup. `liblog.sh` is fail-soft: it sources lib-log's NFS `.env` only when `AXIOM_TOKEN` is unset, builds the same 10-column row as TypeScript/Python, and sends it through a detached direct Axiom `curl` so instant-exit scripts do not wait for the network. When the durable spool shipper lands, it should replace `liblog.sh`'s single network call with the same spool append used by TypeScript/Python.
+
+The transient exception applies only when all are true:
+- Not symlinked onto `PATH` by `ccsync`.
+- No `--help` or subcommand surface.
+- Single-purpose internal glue invoked only by an already-logged entrypoint or one-shot migration/bootstrap.
+
+**Coupling with single-exit:** adding this line to a CLI that did not previously construct a logger makes the single-exit / `await shutdown()` contract mandatory — the newly-constructed logger keeps the event loop alive and the process hangs on exit without it. See "Single-Exit Pattern for CLIs with lib-utils/logger" in `$mdr:dev-core`.
+
+**lib-cache `cached`-daemon exception:** when a warmable cache's `refreshCommand` is itself a CLI, the `cached` daemon shells out to that command cross-process on the cache's freshness schedule (per `$mdr:lib-cache`). Those subprocesses emit a real `CLI invoked` row, but with `caller: service` — daemon/cron infrastructure, not user or agent usage. Do NOT special-case, rename, or suppress the invocation log to compensate: emit it normally. Caller classification is the contract — `$mdr:mon-skills` already excludes `service` and `ssh` rows, so a `refreshCommand` CLI is not credited as usage without any change at the emitting site.
 
 **Triggering logs to verify integration:** NEVER create test scripts. Instead:
 1. Run existing tests (`bun run test`, `pytest`)
@@ -2630,6 +2658,8 @@ If no existing code path emits logs, the project needs lib-log integration first
 File: lib-utils/scripts/_LIB-UTILS_update-dependents
 ================
 #!/usr/bin/env bash
+
+LIBLOG_ORIGINAL_ARGS=("$@")
 # Update all projects that depend on @mdr/lib-utils to latest version
 
 set -uo pipefail  # Removed -e to not exit on errors
@@ -2727,20 +2757,9 @@ if $JSON; then
   command -v jq >/dev/null 2>&1 || usage_error "Required tool not in PATH for --json: jq"
 fi
 
-log_invocation() {
-  command -v bun >/dev/null 2>&1 || return 0
-  (
-    cd "$ROOT_DIR" || exit 0
-    bun --silent --eval '
-      import { createLogger, shutdown } from "./src/logger.ts";
-      const log = createLogger("mdr:lib-utils:update-dependents");
-      log.debug("CLI invoked", { argv: process.env.LIB_UTILS_ARGV?.split("\n").filter(Boolean) ?? [] });
-      await shutdown();
-    '
-  ) >/dev/null 2>&1 || true
-}
-
-LIB_UTILS_ARGV="$(printf '%s\n' "$@")" log_invocation
+LIBLOG_PROJECT="mdr:lib-utils:update-dependents"
+_liblog="$HOME/mnt/mdr/skills/lib-log/scripts/liblog.sh"; [[ -r $_liblog ]] || _liblog="$(command -v liblog.sh 2>/dev/null)"
+[[ -n ${_liblog:-} && -r $_liblog ]] && { source "$_liblog"; liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"; } || true
 
 # Bootstrap bun link registrations across the monorepo.
 # Discovers every link:@scope/name reference in non-vendored package.json files,
@@ -3194,7 +3213,7 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (60.8k)
+# lib-utils (62.8k)
 ## Documentation (5.1k)
 - [@SKILL.md (4k)](https://hackmd.io/BTKKST7BQE6IF5e5ltPECQ)
 - @CONTRIBUTING.md (500)
@@ -3205,16 +3224,16 @@ requiredFiles:
 - @src/env.ts (700)
 - @src/logger.ts (1.4k)
 
-## requiredSkills (51k)
+## requiredSkills (53k)
 - [@../dev-typescript/SKILL.md (7k)](https://hackmd.io/GHeNbSgET7-h5JZtOxFSnQ)
   - [@../dev-typescript/audit/checklist.md (4k)](https://hackmd.io/JlOt5ab6SoCwoNk8kYLX_g)
   - [@../dev-core/SKILL.md (16k)](https://hackmd.io/WJLdXgBGT-uZbR0JB1wFcA)
     - [@../dev-core/audit/checklist.md (3k)](https://hackmd.io/u_ZWdh9gTCG1WvFiBveCxA)
   - [@SKILL.md (4k)](https://hackmd.io/BTKKST7BQE6IF5e5ltPECQ)
 - @../lib-1password/SKILL.md (2k)
-- [@../lib-log/SKILL.md (10k)](https://hackmd.io/VM3trgJZQZ6OCyCi_WRm9A)
-  - [@../lib-log/README.md (1k)](https://hackmd.io/A4-J5mShRJ-cuVwh7jiclg)
-- [@../edit-skill/SKILL.md (4k)](https://hackmd.io/_00WTNIJSRWIEqWvBnFqEw)
+- [@../lib-log/SKILL.md (11k)](https://hackmd.io/VM3trgJZQZ6OCyCi_WRm9A)
+  - [@../lib-log/README.md (2k)](https://hackmd.io/8nInNBtIR9WwJu0r9WwFHg)
+- [@../edit-skill/SKILL.md (4k)](https://hackmd.io/foCrga-3TuOxEwwlxgOrSg)
 
 ================
 File: lib-utils/CONTRIBUTING.md
