@@ -10,9 +10,9 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (64.1k)
-## Documentation (5.3k)
-- [@SKILL.md (4.2k)](https://hackmd.io/bEJKwd6dRByU0R89mUlIdg)
+# lib-utils (64.2k)
+## Documentation (5.4k)
+- [@SKILL.md (4.4k)](https://hackmd.io/bEJKwd6dRByU0R89mUlIdg)
 - @CONTRIBUTING.md (500)
 - @package.json (500)
 
