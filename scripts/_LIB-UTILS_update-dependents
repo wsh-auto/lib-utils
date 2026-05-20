@@ -27,8 +27,10 @@ ${CYAN}USAGE${NC}
 
 ${CYAN}DESCRIPTION${NC}
     Scans ~/mnt for all package.json files containing @mdr/lib-utils,
-    removes their Bun lockfiles to clear pinned commits, and runs bun install
-    to fetch the latest version from GitHub. Runs in parallel (8 jobs).
+    normalizes any `link:@mdr/lib-utils` specs to `github:wsh-auto/lib-utils`
+    per SKILL.md, removes Bun lockfiles to clear pinned commits, and runs
+    bun install to fetch the latest version from GitHub. Runs in parallel
+    (8 jobs).
 
     ${DIM}Handles monorepo workspaces: if a package is inside a workspace,
     updates the workspace root instead (where bun.lockb lives).${NC}
@@ -208,9 +210,34 @@ find_workspace_root() {
   echo "$dir"  # Not in a workspace, return original
 }
 
-# Find all package.json with lib-utils, resolve to workspace roots, deduplicate
+# Find all package.json with lib-utils
+mapfile -t PJSONS < <(
+  rg -l '@mdr/lib-utils' ~/mnt --glob '**/package.json' --glob '!**/node_modules/**' --no-ignore --no-messages
+)
+
+# Normalize any `link:@mdr/lib-utils` specs to `github:wsh-auto/lib-utils` per SKILL.md.
+# Skip lib-utils' own package.json (self-link is intentional in its monorepo).
+if ! $DRY_RUN; then
+  NORMALIZED=0
+  for pj in "${PJSONS[@]}"; do
+    [[ "$(jq -r '.name // empty' "$pj" 2>/dev/null)" == "@mdr/lib-utils" ]] && continue
+    if jq -e '(.dependencies."@mdr/lib-utils" // .devDependencies."@mdr/lib-utils" // .optionalDependencies."@mdr/lib-utils" // "") | startswith("link:")' "$pj" >/dev/null 2>&1; then
+      tmp=$(mktemp)
+      jq '
+        (if .dependencies."@mdr/lib-utils"         then .dependencies."@mdr/lib-utils"         = "github:wsh-auto/lib-utils" else . end) |
+        (if .devDependencies."@mdr/lib-utils"      then .devDependencies."@mdr/lib-utils"      = "github:wsh-auto/lib-utils" else . end) |
+        (if .optionalDependencies."@mdr/lib-utils" then .optionalDependencies."@mdr/lib-utils" = "github:wsh-auto/lib-utils" else . end)
+      ' "$pj" > "$tmp" && mv "$tmp" "$pj"
+      $JSON || printf "  ${YELLOW}→${NC} normalized link: → github: in ${DIM}%s${NC}\n" "${pj/#$HOME/~}"
+      ((NORMALIZED++)) || true
+    fi
+  done
+  [[ $NORMALIZED -gt 0 ]] && ! $JSON && echo
+fi
+
+# Resolve to workspace roots, deduplicate
 mapfile -t DEPENDENTS < <(
-  rg -l '@mdr/lib-utils' ~/mnt --glob '**/package.json' --glob '!**/node_modules/**' --no-ignore --no-messages | \
+  printf '%s\n' "${PJSONS[@]}" | \
   xargs -I{} dirname {} | \
   while read -r dir; do find_workspace_root "$dir"; done | \
   sort -u
