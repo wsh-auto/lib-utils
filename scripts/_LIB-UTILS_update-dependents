@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+
+LIBLOG_ORIGINAL_ARGS=("$@")
 # Update all projects that depend on @mdr/lib-utils to latest version
 
 set -uo pipefail  # Removed -e to not exit on errors
@@ -96,20 +98,9 @@ if $JSON; then
   command -v jq >/dev/null 2>&1 || usage_error "Required tool not in PATH for --json: jq"
 fi
 
-log_invocation() {
-  command -v bun >/dev/null 2>&1 || return 0
-  (
-    cd "$ROOT_DIR" || exit 0
-    bun --silent --eval '
-      import { createLogger, shutdown } from "./src/logger.ts";
-      const log = createLogger("mdr:lib-utils:update-dependents");
-      log.debug("CLI invoked", { argv: process.env.LIB_UTILS_ARGV?.split("\n").filter(Boolean) ?? [] });
-      await shutdown();
-    '
-  ) >/dev/null 2>&1 || true
-}
-
-LIB_UTILS_ARGV="$(printf '%s\n' "$@")" log_invocation
+LIBLOG_PROJECT="mdr:lib-utils:update-dependents"
+_liblog="$HOME/mnt/mdr/skills/lib-log/scripts/liblog.sh"; [[ -r $_liblog ]] || _liblog="$(command -v liblog.sh 2>/dev/null)"
+[[ -n ${_liblog:-} && -r $_liblog ]] && { source "$_liblog"; liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"; } || true
 
 # Bootstrap bun link registrations across the monorepo.
 # Discovers every link:@scope/name reference in non-vendored package.json files,
