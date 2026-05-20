@@ -7,6 +7,15 @@
  * - CI: console-based stub logger
  * - Missing dep outside CI: fatal error (forces proper setup)
  */
+/** Runtime logger options forwarded to lib-log when available. */
+export interface LoggerOptions {
+    level?: string;
+    axiom?: {
+        enabled?: boolean;
+    };
+    critical?: Record<string, unknown>;
+    timing?: 'cli' | 'worker';
+}
 /** Logger contract exposed by lib-log and the CI stub. */
 interface Logger {
     critical(message: string, fields?: Record<string, unknown>): void;
@@ -24,9 +33,10 @@ interface Logger {
  * Safe to use in CI environments where lib-log may not be installed.
  *
  * @param name - Logger name (appears in log output)
+ * @param options - Optional lib-log runtime configuration
  * @returns Logger instance with critical/debug/info/warn/error/telemetry/trace/child/flush methods
  */
-export declare function createLogger(name: string): Logger;
+export declare function createLogger(name: string, options?: LoggerOptions): Logger;
 /**
  * Flush pending Axiom transports, release lib-log handles, and best-effort
  * drain Node-stream stdout backpressure before process.exit().

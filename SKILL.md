@@ -2,7 +2,7 @@
 name: lib-utils
 description: >-
   CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup. Keywords: "@mdr/lib-utils", "_LIB-UTILS_update-dependents", "bunWrite", "execWithLog", "critical-guard", "Axiom", "1Password"
-hackmd: https://hackmd.io/BTKKST7BQE6IF5e5ltPECQ
+hackmd: https://hackmd.io/bEJKwd6dRByU0R89mUlIdg
 ---
 # lib-utils
 Utilities that enhance development but gracefully degrade in CI environments.
@@ -24,6 +24,7 @@ Utilities that enhance development but gracefully degrade in CI environments.
   - Querying Logs: `ax` CLI
 - helpers / bunWrite()
 - helpers / execWithLog()
+- helpers / measurePhase()
 - helpers / critical-guard()
 - lib-1password / env.ts - initEnv(callerDir, skipIfEnvVars?, log?)
 - Scripts
@@ -62,7 +63,7 @@ Add `.env` to `.gitignore` - it's generated with real values at runtime.
 ```typescript
 import { createLogger } from '@mdr/lib-utils/logger';
 
-const log = createLogger('my-project');
+const log = createLogger('my-project:cli', { timing: 'cli' });
 
 log.critical('Build failed', { taskId: 'abc123' });
 log.info('Starting');
@@ -77,6 +78,8 @@ await log.flush();
 - If not + not CI: exit(1) with instructions to add to optionalDependencies
 
 **TypeScript levels:** `critical` (stderr+Axiom+Telegram escalation), `error`/`warn`/`info`/`debug` (stderr+Axiom), `telemetry` (Axiom-only), `trace` (stderr-only). Python stays on `debug`/`info`/`warn`/`error`.
+
+**Lifecycle timing:** TypeScript CLI and worker entrypoints declare lifecycle telemetry on their one entry logger: `createLogger('project:cli', { timing: 'cli' })` or `createLogger('project:worker', { timing: 'worker' })`. CLI timing stays top-level; set `skipAwaitShutdown = true` from any branch where the CLI should skip the drain and timing emit — typical cases include `--help`, `--version`, `--list-commands`, no-args-shows-help, unknown-subcommand-shows-help, and any `--dry-run` that prints and exits without doing real work. lib-log auto-emits `<type> boot` at logger creation and `<type> exit` from `shutdown()` with `{ wallMs, exitCode }`. Do not manually emit `log.debug('CLI invoked')`; that retired literal is no longer the contract.
 
 **Piped output >64KB: use `bunWrite()`, NOT `console.log`.** Under Bun on macOS, importing lib-log (or anything that touches `process.stdout` listeners — including `import('winston')` itself) silently switches `console.log` to a buffered path that drops bytes >64KB on `process.exit()`. `shutdown()` cannot rescue these — the bytes are dropped at write-time. Replace `console.log(JSON.stringify(x, null, 2))` with `await bunWrite('stdout', JSON.stringify(x, null, 2) + '\n')` from `@mdr/lib-utils/helpers` for any CLI `--json` branch that may emit >64KB. See § "helpers / bunWrite()" below.
 
@@ -103,7 +106,7 @@ await log.flush();
 - `stdout` - composable data only (JSON, IDs, paths, tables). Must contain nothing that wouldn't make sense piped to another program. Banned: `console.log` for progress/status messages.
 - `stderr` - everything useful for debugging later (state, status, progress, decisions, errors). MUST go through lib-log (`log.info`/`log.debug`/etc.), never via raw `console.error`. `log.*()` already writes to stderr via `StderrTransport` and also ships to Axiom, so `console.error` double-prints locally while bypassing structured logging and cloud persistence. For CLI catch blocks, use `log.warn()` for handled exits and `log.error()` for bug paths; see `$mdr:dev-core` for the single-exit pattern.
 - `--help`/`--version` - no need for logging
-- "CLI invoked" / argv dumps - `log.debug()` only, never on `--help`/`--version`, never include secrets
+- Lifecycle rows - declare `timing: 'cli' | 'worker'` on the entry logger; never manually log `CLI invoked`, argv dumps, or secrets
 - If per-item status is already printed, log per-item at `debug` and keep `info` for summaries and durable side effects
 
 **Required logging (add these to your code):**
@@ -203,6 +206,13 @@ Use `execWithLog()` for synchronous subprocess calls with timeout budgets.
 - On `ETIMEDOUT`, it emits `subprocess timeout` with `{ cmd, args, timeoutMs, elapsedMs, signal }`, then throws `ExecTimeoutError`.
 - Non-timeout subprocess failures rethrow unchanged.
 - Implementation lives in `@mdr/lib-helpers`; consumer packages import the stable re-export from `@mdr/lib-utils/helpers`.
+
+## helpers / measurePhase()
+```typescript
+import { measurePhase, measurePhaseSync } from '@mdr/lib-utils/helpers';
+```
+
+Use `measurePhase(phase, asyncFn, { log? })` or `measurePhaseSync(phase, fn, { log? })` for wall-clock-only phase timing. Both emit `log.debug('phase elapsed', { phase, wallMs })` from a `finally` block, so thrown errors still propagate after the timing row. CPU and event-loop dimensions belong in `deathWatch.measure` for daemon code.
 
 ## helpers / critical-guard()
 Import `critGuardCli`, `critGuardDaemonLoop`, and sentinel helpers from `@mdr/lib-utils/helpers/critical-guard`.

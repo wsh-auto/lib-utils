@@ -10,6 +10,14 @@
 
 import { isOptionalDepMissing } from './optional-dep.js';
 
+/** Runtime logger options forwarded to lib-log when available. */
+export interface LoggerOptions {
+  level?: string;
+  axiom?: { enabled?: boolean };
+  critical?: Record<string, unknown>;
+  timing?: 'cli' | 'worker';
+}
+
 /** Logger contract exposed by lib-log and the CI stub. */
 interface Logger {
   critical(message: string, fields?: Record<string, unknown>): void;
@@ -24,7 +32,7 @@ interface Logger {
 }
 
 /** Type matching lib-log's createLogger signature. */
-type CreateLoggerFn = (name: string) => Logger;
+type CreateLoggerFn = (name: string, options?: LoggerOptions) => Logger;
 
 /** Create a console-based stub logger for CI environments */
 function _createStubLogger(name: string, parentFields: Record<string, unknown> = {}): Logger {
@@ -65,7 +73,7 @@ try {
   if (process.env.CI) {
     // CI: lib-log not needed, use console-based stub
     console.log(`[lib-utils] lib-log not available, using stub (caller: ${caller})`);
-    libLog = { createLogger: _createStubLogger };
+    libLog = { createLogger: (name: string) => _createStubLogger(name) };
   } else {
     // Development: lib-log is required, fail loudly
     console.error(
@@ -84,10 +92,11 @@ try {
  * Safe to use in CI environments where lib-log may not be installed.
  *
  * @param name - Logger name (appears in log output)
+ * @param options - Optional lib-log runtime configuration
  * @returns Logger instance with critical/debug/info/warn/error/telemetry/trace/child/flush methods
  */
-export function createLogger(name: string): Logger {
-  return libLog.createLogger(name);
+export function createLogger(name: string, options?: LoggerOptions): Logger {
+  return libLog.createLogger(name, options);
 }
 
 /**
