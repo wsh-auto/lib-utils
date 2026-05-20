@@ -27,7 +27,7 @@ ${CYAN}USAGE${NC}
 
 ${CYAN}DESCRIPTION${NC}
     Scans ~/mnt for all package.json files containing @mdr/lib-utils,
-    normalizes any `link:@mdr/lib-utils` specs to `github:wsh-auto/lib-utils`
+    normalizes any link:@mdr/lib-utils specs to github:wsh-auto/lib-utils
     per SKILL.md, removes Bun lockfiles to clear pinned commits, and runs
     bun install to fetch the latest version from GitHub. Runs in parallel
     (8 jobs).
