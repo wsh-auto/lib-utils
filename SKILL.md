@@ -25,6 +25,7 @@ Utilities that enhance development but gracefully degrade in CI environments.
 - helpers / bunWrite()
 - helpers / execWithLog()
 - helpers / measurePhase()
+- helpers / agentSandboxDir()
 - helpers / critical-guard()
 - lib-1password / env.ts - initEnv(callerDir, skipIfEnvVars?, log?)
 - Scripts
@@ -213,6 +214,9 @@ import { measurePhase, measurePhaseSync } from '@mdr/lib-utils/helpers';
 ```
 
 Use `measurePhase(phase, asyncFn, { log? })` or `measurePhaseSync(phase, fn, { log? })` for wall-clock-only phase timing. Both emit `log.debug('phase elapsed', { phase, wallMs })` from a `finally` block, so thrown errors still propagate after the timing row. CPU and event-loop dimensions belong in `deathWatch.measure` for daemon code.
+
+## helpers / agentSandboxDir()
+Import `agentSandboxDir` and `AGENT_SANDBOX_ROOT` from `@mdr/lib-utils/helpers`. Use the stable default for named reusable test roots, `{ stable: false }` for mkdtemp-style ephemeral dirs, and `/private/tmp/agent-sandbox/<project>/<purpose>` for static config values that cannot call the helper.
 
 ## helpers / critical-guard()
 Import `critGuardCli`, `critGuardDaemonLoop`, and sentinel helpers from `@mdr/lib-utils/helpers/critical-guard`.

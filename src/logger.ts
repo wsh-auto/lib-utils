@@ -15,6 +15,7 @@ export interface LoggerOptions {
   level?: string;
   axiom?: { enabled?: boolean };
   critical?: Record<string, unknown>;
+  caller?: 'human' | 'claude' | 'codex' | 'gemini' | 'ssh' | 'service' | 'automation';
   timing?: 'cli' | 'worker';
 }
 

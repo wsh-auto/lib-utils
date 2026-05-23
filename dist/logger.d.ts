@@ -14,6 +14,7 @@ export interface LoggerOptions {
         enabled?: boolean;
     };
     critical?: Record<string, unknown>;
+    caller?: 'human' | 'claude' | 'codex' | 'gemini' | 'ssh' | 'service' | 'automation';
     timing?: 'cli' | 'worker';
 }
 /** Logger contract exposed by lib-log and the CI stub. */

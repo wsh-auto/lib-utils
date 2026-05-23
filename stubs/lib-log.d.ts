@@ -15,6 +15,14 @@ declare module '@mdr/lib-log' {
     flush(): Promise<void>;
   }
 
-  export function createLogger(name: string): Logger;
+  interface LoggerOptions {
+    level?: string;
+    axiom?: { enabled?: boolean };
+    critical?: Record<string, unknown>;
+    caller?: 'human' | 'claude' | 'codex' | 'gemini' | 'ssh' | 'service' | 'automation';
+    timing?: 'cli' | 'worker';
+  }
+
+  export function createLogger(name: string, options?: LoggerOptions): Logger;
   export function shutdown(): Promise<void>;
 }
