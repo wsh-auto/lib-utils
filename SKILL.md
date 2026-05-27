@@ -4,7 +4,9 @@ description: >-
   CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup. Keywords: "@mdr/lib-utils", "_LIB-UTILS_update-dependents", "bunWrite", "execWithLog", "critical-guard", "Axiom", "1Password"
 hackmd: https://hackmd.io/bEJKwd6dRByU0R89mUlIdg
 ---
+
 # lib-utils
+
 Utilities that enhance development but gracefully degrade in CI environments.
 
 | Import Path | Optional Dep | With Dep | Without Dep (CI) | Without Dep (not CI) |
@@ -18,10 +20,10 @@ Utilities that enhance development but gracefully degrade in CI environments.
 ## TABLE OF CONTENTS
 - Installation
 - lib-log / Logging
-  - logger.ts - createLogger(project-name)
-  - Logging Policy
-  - Browser - createLogger(project-name)
-  - Querying Logs: `ax` CLI
+    - logger.ts - createLogger(project-name)
+    - Logging Policy
+    - Browser - createLogger(project-name)
+    - Querying Logs: `ax` CLI
 - helpers / bunWrite()
 - helpers / execWithLog()
 - helpers / measurePhase()
@@ -31,19 +33,21 @@ Utilities that enhance development but gracefully degrade in CI environments.
 - Scripts
 
 ## Installation
-```bash
+
+`````bash!
 bun add github:wsh-auto/lib-utils
-```
+`````
 
 **Consumer `package.json` (only include optionalDeps you use):**
-```json
+
+`````json!
 "dependencies": {
   "@mdr/lib-utils": "github:wsh-auto/lib-utils"
 },
 "optionalDependencies": {
   "@mdr/lib-log": "link:@mdr/lib-log"
 }
-```
+`````
 
 - **Separate exports**: Import from `/logger` or `/env` - each loads only its optional dep
 - **lib-utils**: always `github:` in dependencies
@@ -54,14 +58,18 @@ bun add github:wsh-auto/lib-utils
 - **Direct `@mdr/lib-log/*` subpath imports** (e.g. `@mdr/lib-log/death-watch`) bypass the lib-utils graceful-degradation wrapper. If you statically import from a `@mdr/lib-log/*` subpath, declare `@mdr/lib-log` as a **required** dependency, not optional — module evaluation will fail at startup otherwise.
 
 **For 1Password env injection**, create `.env.template` (committed) with `op://` refs:
-```bash
+
+`````bash!
 export MY_API_KEY=op://wsh/skills_my-project/API_KEY
-```
+`````
+
 Add `.env` to `.gitignore` - it's generated with real values at runtime.
 
 ## lib-log / Logging
+
 ### logger.ts - createLogger(project-name)
-```typescript
+
+`````typescript!
 import { createLogger } from '@mdr/lib-utils/logger';
 
 const log = createLogger('my-project:cli', { timing: 'cli' });
@@ -72,7 +80,7 @@ log.error('Failed', { code: 500 });
 log.telemetry('Queue sample', { depth: 3 });
 log.trace('Polling tick');
 await log.flush();
-```
+`````
 
 - If `@mdr/lib-log` installed: full Axiom logging (Winston-backed TypeScript; Python available via direct lib-log import)
 - If not + CI: console-based stub (`telemetry()` becomes a no-op; the other levels stay local)
@@ -127,29 +135,31 @@ await log.flush();
 Why: `grep`/`rg` for `log\.` returns complete call sites with all fields visible. `ax` dashboards render cleanly. Multi-line wrap hides context fields from text search and breaks Axiom row rendering.
 
 Banned shape:
-```typescript
+
+`````typescript!
 log.debug('thing happened', {
   field1,
   field2,
 });
-```
+`````
 
 Correct shape:
-```typescript
+
+`````typescript!
 log.debug('thing happened', { field1, field2 });
-```
+`````
 
 The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `LOG_LEVEL=debug` via `overmind.env`. All levels still ship to Axiom.
 
 ### Browser - createLogger(project-name)
 For frontend/browser environments (e.g., React apps bundled with Vite):
 
-```typescript
+`````typescript!
 import { createLogger } from '@mdr/lib-utils/browser';
 
 const log = createLogger('wsh:frontend');
 log.info('Page loaded');
-```
+`````
 
 **Key differences from `/logger`:**
 - No Node.js APIs (works in browsers)
@@ -160,14 +170,14 @@ log.info('Page loaded');
 ### Querying Logs: `ax` CLI
 **Naming convention:** Logger name = folder name. If you're in `cli-tt/`, logs are at `--project cli-tt` (auto-catches subsystems like `cli-tt:daemon`, `cli-tt:pool`).
 
-```bash
+`````bash!
 ax                          # Logs for current folder (auto-detects)
 ax projects                 # List all project names
 ax --project '*cli-tt*'     # All cli-tt subsystems (glob pattern)
 ax --level error            # Filter by level
 ax --json                   # JSON output for agents
 ax --all-hosts              # Logs from every machine (default: caller hostname only)
-```
+`````
 
 **Gotcha: cross-host logs are filtered out by default.** Both `ax` (CLI) and the programmatic `query()` library auto-append `| where hostname == '<caller-hostname>'` to every flag-driven query. Logs written by other machines (e.g. daemons running on `m3` while you're on `mbp`) won't appear unless you pass `--all-hosts` (CLI) or `{ allHosts: true }` (library). The CLI header reads `host: mbp` / `host: ALL` so the scope is visible. APL passthrough disables auto-filter — once you write your own APL, you own the host scope.
 
@@ -180,12 +190,13 @@ ax --all-hosts              # Logs from every machine (default: caller hostname 
 See `$mdr:lib-log` for full ax documentation including APL passthrough.
 
 ## helpers / bunWrite()
-```typescript
+
+`````typescript!
 import { bunWrite } from '@mdr/lib-utils/helpers';
 
 await bunWrite('stdout', JSON.stringify(result, null, 2) + '\n');
 await bunWrite('stderr', 'something happened\n');
-```
+`````
 
 Use `bunWrite()` for any CLI `--json` branch (or other large stdout/stderr emit) that may exceed ~64KB. Under Bun on macOS, once anything attaches a listener to `process.stdout` (which `import('winston')` does as a side effect), `console.log` switches to a buffered path that drops bytes >64KB on `process.exit()` when the downstream reader is slow. `bunWrite()` delegates to `Bun.write(Bun.stdout, …)` which takes a different code path and delivers all bytes intact. When auditing migrations to `bunWrite()`, search semantic JSON-output wrappers and raw stdout writes as well as direct `console.log(JSON.stringify(...))`, then smoke the shipped command through a pipe.
 
@@ -195,11 +206,12 @@ Use `bunWrite()` for any CLI `--json` branch (or other large stdout/stderr emit)
 - Under-the-hood mechanism, refuted alternatives, and the original investigation are documented in `~/mnt/plans/tidy-weaving-hellman.md` (`hackmd: g5bQPS4yT0yMooinFuJLNQ`).
 
 ## helpers / execWithLog()
-```typescript
+
+`````typescript!
 import { execWithLog } from '@mdr/lib-utils/helpers';
 
 const out = execWithLog('tt', ['panes', '--json'], { timeoutMs: 15_000, log });
-```
+`````
 
 Use `execWithLog()` for synchronous subprocess calls with timeout budgets.
 - `timeoutMs` is required and maps to Node's `timeout`; callers do not pass bare `timeout`.
@@ -209,9 +221,10 @@ Use `execWithLog()` for synchronous subprocess calls with timeout budgets.
 - Implementation lives in `@mdr/lib-helpers`; consumer packages import the stable re-export from `@mdr/lib-utils/helpers`.
 
 ## helpers / measurePhase()
-```typescript
+
+`````typescript!
 import { measurePhase, measurePhaseSync } from '@mdr/lib-utils/helpers';
-```
+`````
 
 Use `measurePhase(phase, asyncFn, { log? })` or `measurePhaseSync(phase, fn, { log? })` for wall-clock-only phase timing. Both emit `log.debug('phase elapsed', { phase, wallMs })` from a `finally` block, so thrown errors still propagate after the timing row. CPU and event-loop dimensions belong in `deathWatch.measure` for daemon code.
 
@@ -229,7 +242,8 @@ Import `critGuardCli`, `critGuardDaemonLoop`, and sentinel helpers from `@mdr/li
 - Daemon shutdown stays one-line: `await shutdown()` from `@mdr/lib-utils/logger` drains both Axiom and death-watch.
 
 ## lib-1password / env.ts - initEnv(callerDir, skipIfEnvVars?, log?)
-```typescript
+
+`````typescript!
 import { initEnv } from '@mdr/lib-utils/env';
 
 // Canonical: pass `import.meta.dirname` from anywhere inside the package.
@@ -239,7 +253,7 @@ initEnv(import.meta.dirname);
 // With optional skip-fast-path and custom logger:
 initEnv(import.meta.dirname, ['MY_API_KEY']);             // skip if env vars already set
 initEnv(import.meta.dirname, [], customLogger);           // custom logger (must have info/error)
-```
+`````
 
 `callerDir` is any path inside the package — no `resolve(..., '..')` math needed regardless of nesting depth.
 

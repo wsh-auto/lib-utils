@@ -101,8 +101,8 @@ if $JSON; then
 fi
 
 LIBLOG_PROJECT="mdr:lib-utils:update-dependents"
-_liblog="$HOME/mnt/mdr/skills/lib-log/scripts/liblog.sh"; [[ -r $_liblog ]] || _liblog="$(command -v liblog.sh 2>/dev/null)"
-[[ -n ${_liblog:-} && -r $_liblog ]] && { source "$_liblog"; liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"; } || true
+_liblog="$HOME/mnt/mdr/skills/lib-log/src/bash/liblog"
+[[ -r $_liblog ]] && { source "$_liblog"; liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"; } || true
 
 # Bootstrap bun link registrations across the monorepo.
 # Discovers every link:@scope/name reference in non-vendored package.json files,
