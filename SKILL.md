@@ -1,8 +1,8 @@
 ---
 name: lib-utils
 description: >-
-  CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup. Keywords: "@mdr/lib-utils", "_LIB-UTILS_update-dependents", "bunWrite", "execWithLog", "critical-guard", "Axiom", "1Password"
-hackmd: https://hackmd.io/bEJKwd6dRByU0R89mUlIdg
+  CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup. Keywords: "@mdr/lib-utils", "_LIB-UTILS_update-dependents", "bunWrite", "runLogged", "execWithLog", "critical-guard", "Axiom", "1Password"
+hackmd: https://hackmd.io/j6cieQ5IRj6SNgqingxOCQ
 ---
 
 # lib-utils
@@ -14,7 +14,7 @@ Utilities that enhance development but gracefully degrade in CI environments.
 | `@mdr/lib-utils/logger` | lib-log | Axiom logging | Console stub | **exit(1)** |
 | `@mdr/lib-utils/env` | lib-1password | 1Password injection | No-op stub | **exit(1)** |
 | `@mdr/lib-utils/browser` | lib-log | Console-only browser logger | Console stub | Console stub |
-| `@mdr/lib-utils/helpers` | (none) | `bunWrite()`, `buildReporters()` | same | same |
+| `@mdr/lib-utils/helpers` | (none) | `bunWrite()`, `buildReporters()`, `runLogged()` | same | same |
 | `@mdr/lib-utils/helpers/critical-guard` | lib-log | Entry critical guards + death-watch | same, no death-watch | same, no death-watch |
 
 ## TABLE OF CONTENTS
@@ -25,6 +25,7 @@ Utilities that enhance development but gracefully degrade in CI environments.
     - Browser - createLogger(project-name)
     - Querying Logs: `ax` CLI
 - helpers / bunWrite()
+- helpers / runLogged()
 - helpers / execWithLog()
 - helpers / measurePhase()
 - helpers / agentSandboxDir()
@@ -204,6 +205,20 @@ Use `bunWrite()` for any CLI `--json` branch (or other large stdout/stderr emit)
 - On Node (no Bun global), falls back to `process.stdout.write(buf, callback)` so the same call site works in dual-runtime libs.
 - Implementation lives in `@mdr/lib-helpers` (pure, no optional deps), but consumers import this helper from `@mdr/lib-utils/helpers`.
 - Under-the-hood mechanism, refuted alternatives, and the original investigation are documented in `~/mnt/plans/tidy-weaving-hellman.md` (`hackmd: g5bQPS4yT0yMooinFuJLNQ`).
+
+## helpers / runLogged()
+
+`````typescript!
+import { runLogged, runLoggedSync } from '@mdr/lib-utils/helpers';
+`````
+
+Use `runLoggedSync(file, args, opts)` or `await runLogged(file, args, opts)` for subprocesses that need one External-API-Returns row after completion. The canonical row is `{ path, method, elapsedMs, status }`; `path` names the operation such as `tmux has-session`, while `method` is the mechanism (`execFileSync` or `spawn`).
+- `expectedExitCodes` defaults to `[0]` and controls `ok`.
+- `throwOnFailure` defaults to `true`; set `false` for probes and branch on `result.ok`.
+- `level: 'debug'` moves success rows off info for hot paths; failures still use `log.error`.
+- `timeoutMs` maps to sync timeout or async kill and records status `124`.
+
+Implementation lives in `@mdr/lib-helpers`; consumer packages import the stable re-export from `@mdr/lib-utils/helpers`.
 
 ## helpers / execWithLog()
 

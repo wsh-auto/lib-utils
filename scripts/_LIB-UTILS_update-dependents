@@ -102,7 +102,25 @@ fi
 
 LIBLOG_PROJECT="mdr:lib-utils:update-dependents"
 _liblog="$HOME/mnt/mdr/skills/lib-log/src/bash/liblog"
-[[ -r $_liblog ]] && { source "$_liblog"; liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"; } || true
+LIBLOG_SOURCED=false
+[[ -r $_liblog ]] && { source "$_liblog"; liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"; LIBLOG_SOURCED=true; } || true
+
+# Emit an after-return structured log row for an external subprocess (bun link /
+# bun install). Method/path/outcome/elapsedMs go inline in the message AND in the
+# structured context payload. No-op when liblog isn't available (CI / lib-log
+# uninstalled) so the script stays usable without the logger.
+# Usage: _liblog_after_return <level> <message> <k1> <v1> <k2> <v2> ...
+_liblog_after_return() {
+  local level="$1"; shift
+  local message="$1"; shift
+  $LIBLOG_SOURCED || return 0
+  local ctx="{}"
+  while [[ $# -ge 2 ]]; do
+    ctx=$(jq -c --arg k "$1" --arg v "$2" '. + {($k): $v}' <<<"$ctx" 2>/dev/null || echo "$ctx")
+    shift 2
+  done
+  LIBLOG_CONTEXT_JSON="$ctx" liblog_emit "$level" "$message"
+}
 
 # Bootstrap bun link registrations across the monorepo.
 # Discovers every link:@scope/name reference in non-vendored package.json files,
@@ -160,9 +178,13 @@ bootstrap_links() {
       continue
     fi
     if (cd "$src" && bun link >/dev/null 2>&1); then
+      _liblog_after_return info "link bun link ${pkg}: ok" \
+        method "bun-link" path "$src" outcome "ok" pkg "$pkg"
       printf "  ${GREEN}✓${NC} %s ${DIM}%s${NC}\n" "$pkg" "${src/#$HOME/~}"
       ((registered++)) || true
     else
+      _liblog_after_return error "link bun link ${pkg}: failed" \
+        method "bun-link" path "$src" outcome "failed" pkg "$pkg"
       printf "  ${RED}✗${NC} %s ${DIM}bun link failed${NC}\n" "$pkg"
       ((failed++)) || true
     fi
@@ -305,12 +327,17 @@ update_project() {
     fi
   fi
 
-  local output exit_code
+  local output exit_code start_ms end_ms elapsed_ms
+  start_ms=$(($(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))))
   output=$(bun run with-lock:install 2>&1) && exit_code=0 || exit_code=$?
+  end_ms=$(($(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))))
+  elapsed_ms=$((end_ms - start_ms))
 
   if [[ $exit_code -eq 0 ]]; then
     local version
     version=$(echo "$output" | grep -o '@mdr/lib-utils@github:wsh-auto/lib-utils#[a-f0-9]*' | head -1 | sed 's/.*#//' | cut -c1-7)
+    _liblog_after_return info "install bun run with-lock:install ${short_path}: ok (${elapsed_ms}ms)" \
+      method "bun-install" path "$dir" outcome "ok" elapsedMs "$elapsed_ms" version "${version:-ok}"
     if $JSON; then
       jq -cn --arg path "$dir" --arg version "${version:-ok}" '{path:$path,ok:true,version:$version}' >> "$RESULT_FILE"
     else
@@ -320,6 +347,8 @@ update_project() {
   else
     local err_msg
     err_msg=$(echo "$output" | grep -i -E 'error|fail' | head -1 | cut -c1-50)
+    _liblog_after_return error "install bun run with-lock:install ${short_path}: failed (${elapsed_ms}ms)" \
+      method "bun-install" path "$dir" outcome "failed" elapsedMs "$elapsed_ms" status "$exit_code" error "${err_msg:-failed}"
     if $JSON; then
       jq -cn --arg path "$dir" --arg error "${err_msg:-failed}" '{path:$path,ok:false,error:$error}' >> "$RESULT_FILE"
     else
@@ -329,8 +358,8 @@ update_project() {
   fi
 }
 
-export -f update_project
-export HOME CLEAN JSON RESULT_FILE
+export -f update_project _liblog_after_return
+export HOME CLEAN JSON RESULT_FILE LIBLOG_SOURCED
 
 FAIL=0
 if $PARALLEL; then
