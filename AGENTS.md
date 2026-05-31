@@ -1833,7 +1833,7 @@ Every external API call MUST log once after it returns, preferably in the shared
 - Failure: `log.error('<api> <METHOD> <path/op> failed code=<errcode> [status.code=<n>]', { path, method, elapsedMs, status?, error })`, then rethrow. Downgrade known-recoverable failures to `warn` only when the catch site says why.
 - `elapsedMs` is per HTTP round-trip or subprocess invocation, not per logical call. Include raw external signal where reachable: status code, body excerpt around 500 chars, exit code, stderr/stdout tail, or SDK `err.code ?? err.name`.
 - External means HTTP/HTTPS to non-localhost, IMAP/SMTP/WebSocket, MCP stdio, or subprocesses of CLIs we do not own. Local fs/sqlite, `$lib-cache`, same-process IPC, and owned localhost daemons are out of scope.
-- Carve-out (do NOT wrap with after-return rows): owned monorepo CLIs (e.g. `tt`); local OS/dev tooling (`tmux`, `ps`, `pgrep`, `git`) on hot or polling paths; and probes whose non-zero exit is normal control flow (`tmux has-session`, `pgrep` no-match). Per-call rows here spam `info` and emit false `error` on the happy path. When such a call genuinely needs a timeout plus one structured row, route it through `execWithLog` (`@mdr/lib-utils/helpers`) — it owns the timeout and the row shape — rather than hand-rolling a per-call logging wrapper.
+- Use the shared helper; do NOT hand-roll. Subprocess after-return logging goes through `runLogged` / `runLoggedSync` from `@mdr/lib-utils/helpers`, which owns the canonical row plus `timeoutMs`, `expectedExitCodes` (exit ∈ expected → `info`, so probes like `tmux has-session` / `pgrep` no-match don't emit false `error`), and `level: 'debug'` (for hot/polling paths that would otherwise spam `info`). Banned: bespoke per-call exec wrappers or `_logXxxReturn` helpers that re-implement the row. Owned monorepo CLIs (e.g. `tt`) stay out of scope per the line above. **Scope:** applies to new or touched call sites — NOT a mandate to retroactively wrap every existing `execFileSync`/`spawn`.
 - Reviewer self-tell: `ax --project '*<skill>*' --start-time 1h` should show one `info` row per successful call with `path` + `elapsedMs` + raw outcome, or one `error` row per failed call.
 
 ### CLI Volume Anomaly Tripwire
@@ -2616,7 +2616,7 @@ requiredFiles:
 
 # lib-utils (47.2k)
 ## Documentation (7.6k)
-- [@SKILL.md (4.7k)](https://hackmd.io/bEJKwd6dRByU0R89mUlIdg)
+- [@SKILL.md (4.7k)](https://hackmd.io/j6cieQ5IRj6SNgqingxOCQ)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
 - @anima/memory/DREAM.md (700)
@@ -2629,7 +2629,7 @@ requiredFiles:
 
 ## requiredSkills (34k)
 - [@../dev-typescript/SKILL.md (8k)](https://hackmd.io/6wuVIJ5cQC21FaGpB-irYg)
-  - [@SKILL.md (5k)](https://hackmd.io/bEJKwd6dRByU0R89mUlIdg)
+  - [@SKILL.md (5k)](https://hackmd.io/j6cieQ5IRj6SNgqingxOCQ)
 - [@../lib-1password/SKILL.md (3k)](https://hackmd.io/p4SYLbb2Q46I-ajQH8jeyg)
 - [@../lib-log/SKILL.md (11k)](https://hackmd.io/L1kMcFETTF2fn2vNlXKvgg)
   - [@../lib-log/README.md (2k)](https://hackmd.io/pP_noT1DSaOFhQY2YptApg)
@@ -2770,7 +2770,7 @@ File: lib-utils/SKILL.md
 name: lib-utils
 description: >-
   CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup. Keywords: "@mdr/lib-utils", "_LIB-UTILS_update-dependents", "bunWrite", "runLogged", "execWithLog", "critical-guard", "Axiom", "1Password"
-hackmd: https://hackmd.io/bEJKwd6dRByU0R89mUlIdg
+hackmd: https://hackmd.io/j6cieQ5IRj6SNgqingxOCQ
 ---
 
 # lib-utils
