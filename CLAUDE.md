@@ -10,9 +10,9 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (47.2k)
-## Documentation (7.6k)
-- [@SKILL.md (4.7k)](https://hackmd.io/j6cieQ5IRj6SNgqingxOCQ)
+# lib-utils (47.3k)
+## Documentation (7.8k)
+- [@SKILL.md (4.9k)](https://hackmd.io/j6cieQ5IRj6SNgqingxOCQ)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
 - @anima/memory/DREAM.md (700)

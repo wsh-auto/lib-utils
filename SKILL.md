@@ -1,7 +1,7 @@
 ---
 name: lib-utils
 description: >-
-  CI-safe utilities for TypeScript projects. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Use for projects that need to work in both dev and CI without special setup. Keywords: "@mdr/lib-utils", "_LIB-UTILS_update-dependents", "bunWrite", "runLogged", "execWithLog", "critical-guard", "Axiom", "1Password"
+  This skill should be used when projects need CI-safe utilities that work in both dev and CI without special setup. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Keywords: "@mdr/lib-utils", "_LIB-UTILS_update-dependents", "bunWrite", "runLogged", "execWithLog", "critical-guard", "Axiom", "1Password"
 hackmd: https://hackmd.io/j6cieQ5IRj6SNgqingxOCQ
 ---
 
@@ -26,6 +26,7 @@ Utilities that enhance development but gracefully degrade in CI environments.
     - Querying Logs: `ax` CLI
 - helpers / bunWrite()
 - helpers / runLogged()
+- helpers / sendKillLogged()
 - helpers / execWithLog()
 - helpers / measurePhase()
 - helpers / agentSandboxDir()
@@ -217,8 +218,13 @@ Use `runLoggedSync(file, args, opts)` or `await runLogged(file, args, opts)` for
 - `throwOnFailure` defaults to `true`; set `false` for probes and branch on `result.ok`.
 - `level: 'debug'` moves success rows off info for hot paths; failures still use `log.error`.
 - `timeoutMs` maps to sync timeout or async kill and records status `124`.
+- Returned `stdout` / `stderr` stay complete. Logged `stdoutTail` / `stderrTail` are bounded to 50 lines or 16KB by default; when truncation happens, rows also include bounded `stdoutHead` / `stderrHead`. Pass `stdoutTailBytes: -1` or `stderrTailBytes: -1` only when the full stream is intentionally safe for logs.
 
 Implementation lives in `@mdr/lib-helpers`; consumer packages import the stable re-export from `@mdr/lib-utils/helpers`.
+
+## helpers / sendKillLogged()
+
+Import `sendKillLogged` from `@mdr/lib-utils/helpers` for any TypeScript code that sends process-terminating signals. It logs `{ from, signal, pid, sent }`, treats signal `0` as an unlogged probe, and is ESRCH-safe.
 
 ## helpers / execWithLog()
 
