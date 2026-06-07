@@ -100,6 +100,7 @@ Default runtime is Bun direct-from-`src/`. Exception: packages exporting symbols
     - Entry-Point Critical Guards: Wrap CLI `_main()` and Daemon Loops; Banned: Hand-Rolled Critical Catches
     - Path Comparison: Use `realpathSync()`; Banned: `resolve()` for Deduplication
     - Path Construction: Use `resolve()`; Banned: String Concatenation
+    - Config Loaders: No Env Overrides of `config.yml` by Default
     - CLI Argument Parsing: Use `minimist`; Banned: `args.includes()`, Manual Parsing
     - CLI Table Output: TypeScript-Specific Patterns
     - CLI Design Principles
@@ -322,6 +323,9 @@ const CONFIG_PATH = import.meta.dirname + '/../assets/config.yml';
 **Why:** String concatenation produces `/path/to/dir/../assets/config.yml` which works but isn't canonical. `resolve()` returns `/path/to/assets/config.yml` — cleaner for logging, debugging, and path comparisons.
 
 Note: `initEnv()` from `@mdr/lib-utils/env` does NOT need `resolve()` — it walks up from `import.meta.dirname` automatically. See `$lib-1password` Pattern B.
+
+### Config Loaders: No Env Overrides of `config.yml` by Default
+A TypeScript `config.{ts}` loader MUST NOT shape committed `config.yml` values from `process.env` — e.g. `const x = process.env.X ?? cfg.x` or `envVal ? { ...cfg, key: envVal } : cfg`. A stray shell export then silently changes shipped behavior. Add an env override only for a demonstrated runtime need (and justify it inline at the loader); secret/auth env vars (`*_API_KEY`, tokens) are credentials, not config, and are exempt. Full rule: `$dev-core` § "Banned: Env Vars Overriding `config.yml` Values by Default; Require Demonstrated Need".
 
 ### CLI Argument Parsing: Use `minimist`; Banned: `args.includes()`, Manual Parsing
 **Always use `minimist` for command-line argument parsing.** Never use manual patterns like `args.includes()` or `args.find()`.
@@ -561,19 +565,19 @@ hackmd: https://hackmd.io/KP6XTElkQXuNXale7a0AOQ
 
 ## TABLE OF CONTENTS
 - REQUIRED READING
-    - If creating a New Skill
-    - If creating/editing a "query-" skill (API integration)
-    - If creating/editing an "audit-" skill (quality validation)
+    - If Creating a New Skill
+    - If creating/editing a "query-" Skill (API Integration)
+    - If creating/editing an "Audit-" Skill (Quality Validation)
 - About Skills
     - Naming Skills
     - Anatomy of a Skill
     - Progressive Disclosure Design Principle
     - Skill Boundary == cwd Boundary == Agent Auto-Loaded Context; Split on Context Axis, Not Package Axis
 - YAML Metadata
-    - name: and description:
+    - Name: and Description:
     - Keyword Quality (Banned Patterns)
     - Keyword Selection (What to Include)
-    - host:
+    - Host:
     - disable-model-invocation:
 - Bundled Resources Details
     - scripts/
@@ -585,14 +589,14 @@ hackmd: https://hackmd.io/KP6XTElkQXuNXale7a0AOQ
     - 3\. Generate CLAUDE.md
     - 4\. Validation Workflow
     - 5\. Testing Script Changes
-    - 6\. Audit with `$edit-skill/audit/checklist.md`
-- $edit-skill Scripts
-    - ccsync
+    - 6\. Audit With `$edit-skill/audit/checklist.md`
+- $edit-Skill Scripts
+    - Ccsync
 
 ## REQUIRED READING
 These files are NOT auto-loaded. MUST `Read` them via tool BEFORE proceeding when the matching condition applies. They contain critical workflows that cannot be skipped.
 
-### If creating a New Skill
+### If Creating a New Skill
 MUST Read `references/creating-new-skills.md`.
 
 #### Skill Creation Process
@@ -602,10 +606,10 @@ MUST Read `references/creating-new-skills.md`.
 4. Edit the skill (see editing process above)
 5. Iterate
 
-### If creating/editing a "query-" skill (API integration)
+### If creating/editing a "query-" Skill (API Integration)
 MUST Read `references/special-instructions-use-skills.md`.
 
-### If creating/editing an "audit-" skill (quality validation)
+### If creating/editing an "Audit-" Skill (Quality Validation)
 MUST Read `$audit-core/references/creating-audit-checklists.md`.
 
 ## About Skills
@@ -675,7 +679,7 @@ This boundary is **orthogonal to npm package boundary**. One npm package can cle
 
 ## YAML Metadata
 
-### name: and description:
+### Name: and Description:
 `name:`** and **`description:`** determine when Claude will use the skill. Be specific about what the skill does and when to use it. Use the third-person (e.g. "This skill should be used when..." instead of "Use this skill when..."). For description, use `>-` folded block scalar with content on a single line (never hard-wrap).
 
 `descriptionExempt: true` is an opt-in carve-out for requiredSkills-only or limited/no-description skills. It skips only mechanical `description-form` and `description-hard-wrap` lint; keyword syntax, keyword quality, and `Scripts:` checks still apply.
@@ -699,7 +703,7 @@ Beyond avoiding the banned patterns above, a skill's `Keywords:` SHOULD include 
 - **Acronym + expanded form** when both are commonly used (e.g. "Model Context Protocol (MCP)"); acronym-only when only that is used.
 - **Distinctive topic terms** users would naturally mention when discussing the area (e.g. "cocktail" + "bartending").
 
-### host:
+### Host:
 **`host:`** - Specify when a skill must run on a specific machine (e.g., browser automation, apps only installed there):
 - On target host → run commands directly
 - On different host → `ssh <host> "cd <skill-dir> && <command>"` (via library implementation)
@@ -731,7 +735,7 @@ Executable code (Python/Bash/etc.) for tasks requiring deterministic reliability
         - Exception: pmm-managed daemon wrappers under `scripts/` use the service name directly (e.g., `scripts/srv-mdr`, `scripts/watchd`). The wrapper path IS the Procfile entry and the runtime service identity; see `$ops-pmm` "Procfile Entry Contract".
     - All scripts: Must support `--help`, have proper error handling, be executable with shebang
     - **Banned: same script under two names.** Pick one canonical filename (user-facing short OR agent-facing `_SKILL-NAME_action`); do not ship both via symlink alias. Two names fragment grep, duplicate ccsync entries, and confuse audits about which is the contract.
-- **src/+test/+scripts/ pattern**: Use when lots of shared logic OR importable API needed. Required for use-* and ops-* skills in TypeScript.
+- **src/+test/+scripts/ pattern**: Use when lots of shared logic OR importable API needed. Required for query-* and ops-* skills in TypeScript.
 
 ### references/
 Documentation loaded as needed into context.
@@ -797,16 +801,16 @@ See `$cli-repomix` for more details.
 3. Test script with realistic inputs (dry-run if destructive)
 4. Validate against standards: read `$dev-core/audit/checklist.md`
 
-### 6. Audit with `$edit-skill/audit/checklist.md`
+### 6. Audit With `$edit-skill/audit/checklist.md`
 
-## $edit-skill Scripts
+## $edit-Skill Scripts
 All scripts are globally available in `~/mnt/.bin/`:
 
 | Script | Purpose |
 |--------|---------|
 | `ccsync` | Bootstrap `bun link`, sync skill resources, lint wrappers, write the wrapper registry, and warm dependency markers |
 
-### ccsync
+### Ccsync
 Syncs skill resources to central locations:
 - **Scripts** (`scripts/*`) → `~/mnt/.bin/`
 - **Commands** (`commands/*.md`) → `~/mnt/mdr/commands/`
@@ -1397,7 +1401,7 @@ Python writes the same canonical JSONL rows to the delivery spool using stdlib `
 
 If the spool path is unavailable, Python logs a bounded stderr warning and keeps the caller path fail-soft.
 
-Python also exports `send_kill(pid, signal, *, from_, reason=None)` and `send_pkill(matcher, signal, *, from_)` for kill-site provenance. `send_pkill` accepts `{ argvContains?, command?, ppid?, orphansOnly? }`; `orphansOnly` filters to `PPID == 1`.
+Python also exports `send_kill_logged(pid, signal, *, from_, reason=None)` and `send_pkill_logged(matcher, signal, *, from_)` for kill-site provenance. `send_pkill_logged` accepts `{ argvContains?, command?, ppid?, orphansOnly? }`; `orphansOnly` filters to `PPID == 1`.
 
 ## Frontend (Browser)
 Use `@mdr/lib-utils/browser` for CI-safe imports (graceful degradation when lib-log unavailable):
@@ -2059,6 +2063,10 @@ ${CYAN}EXAMPLES${NC}
     ${DIM}# Preview what would be updated in agent-safe JSON${NC}
     _LIB-UTILS_update-dependents --dry-run --json
 
+${CYAN}INVALID ARGUMENTS${NC}
+    Unknown options and agent-context misuse print the error, this help text,
+    and ${DIM}Hint: _LIB-UTILS_update-dependents --help${NC}, then exit 2.
+
 ${DIM}AGENTS: MUST load \$mdr:lib-utils before editing or for context${NC}
 EOF
 }
@@ -2626,7 +2634,7 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (47.3k)
+# lib-utils (47.4k)
 ## Documentation (7.8k)
 - [@SKILL.md (4.9k)](https://hackmd.io/j6cieQ5IRj6SNgqingxOCQ)
 - @CONTRIBUTING.md (600)
@@ -2635,7 +2643,7 @@ requiredFiles:
 - @anima/memory/PENDING.md (1.2k)
 
 ## Code (5.6k)
-- @scripts/_LIB-UTILS_update-dependents (3.3k)
+- @scripts/_LIB-UTILS_update-dependents (3.4k)
 - @src/env.ts (700)
 - @src/logger.ts (1.5k)
 

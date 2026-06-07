@@ -55,6 +55,10 @@ ${CYAN}EXAMPLES${NC}
     ${DIM}# Preview what would be updated in agent-safe JSON${NC}
     _LIB-UTILS_update-dependents --dry-run --json
 
+${CYAN}INVALID ARGUMENTS${NC}
+    Unknown options and agent-context misuse print the error, this help text,
+    and ${DIM}Hint: _LIB-UTILS_update-dependents --help${NC}, then exit 2.
+
 ${DIM}AGENTS: MUST load \$mdr:lib-utils before editing or for context${NC}
 EOF
 }
