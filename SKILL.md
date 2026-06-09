@@ -2,7 +2,7 @@
 name: lib-utils
 description: >-
   This skill should be used when projects need CI-safe utilities that work in both dev and CI without special setup. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Keywords: "@mdr/lib-utils", "_LIB-UTILS_update-dependents", "bunWrite", "runLogged", "execWithLog", "critical-guard", "Axiom", "1Password"
-hackmd: https://hackmd.io/j6cieQ5IRj6SNgqingxOCQ
+hackmd: https://hackmd.io/8buIJaQ5TD2HtSEz9eo3pg
 ---
 
 # lib-utils
@@ -219,6 +219,7 @@ Use `runLoggedSync(file, args, opts)` or `await runLogged(file, args, opts)` for
 - `level: 'debug'` moves success rows off info for hot paths; failures still use `log.error`.
 - `timeoutMs` maps to sync timeout or async kill and records status `124`.
 - Returned `stdout` / `stderr` stay complete. Logged `stdoutTail` / `stderrTail` are bounded to 50 lines or 16KB by default; when truncation happens, rows also include bounded `stdoutHead` / `stderrHead`. Pass `stdoutTailBytes: -1` or `stderrTailBytes: -1` only when the full stream is intentionally safe for logs.
+- Bounded tails are the subprocess row's default observability, not permission to log arbitrary payload bytes. Third-party wrappers that need durable raw I/O should include payload-stripped, secret-redacted `rawInput` / `rawOutput` in their standard lib-log row; large stdout/stderr payload bytes remain hash+count only unless a domain owner stores them separately and records `payloadStoredBy`.
 
 Implementation lives in `@mdr/lib-helpers`; consumer packages import the stable re-export from `@mdr/lib-utils/helpers`.
 
@@ -256,7 +257,7 @@ Import `agentSandboxDir` and `AGENT_SANDBOX_ROOT` from `@mdr/lib-utils/helpers`.
 Import `critGuardCli`, `critGuardDaemonLoop`, and sentinel helpers from `@mdr/lib-utils/helpers/critical-guard`.
 - `critGuardCli(fn, opts)` wraps CLI `_main()` entry points. It skips `[EXIT/4]` / `[EXIT/5]` structured exits, catches only JS-class trust-contract failures, and does not install death-watch.
 - `critGuardDaemonLoop(fn, opts)` wraps pmm-supervised daemon supervise loops. It catches the same JS-class failures and auto-installs death-watch by default.
-- Guarded classes: `ReferenceError`, `RangeError`, `SyntaxError`, null-deref `TypeError` matching current V8 messages, and Bun's `ResolveMessage` (thrown by static + dynamic `import` when a module is missing — not `instanceof Error`, detected by `name`).
+- Guarded classes: `ReferenceError`, `RangeError`, `SyntaxError`, null-deref `TypeError` matching V8 (`Cannot read/set propert...`) and Bun (`... is not an object`, `... is not a function`) message forms, and Bun's `ResolveMessage` (thrown by static + dynamic `import` when a module is missing — not `instanceof Error`, detected by `name`).
 - Required opts: `siteKey`, `reproducer`, `relevantFiles`, and caller `log`.
 - Sentinel contract: `CRIT_GUARD_FIRED_KEY`, `isCritGuardFired`, `markCritGuardFired`, and `readCritGuardFireKey` store a fire key as `${siteKey}@${ts}`. Inner fires emit `log.critical`; outer catches of the same error downgrade to `log.error` with `correlatedFireKey`.
 - SyntaxError convention: attach `err.cause = { inputPath, input }`; the helper logs `inputPath` and truncated `inputPreview`.

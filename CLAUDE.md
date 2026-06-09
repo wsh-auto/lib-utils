@@ -10,9 +10,9 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (47.4k)
-## Documentation (7.8k)
-- [@SKILL.md (4.9k)](https://hackmd.io/j6cieQ5IRj6SNgqingxOCQ)
+# lib-utils (47.5k)
+## Documentation (7.9k)
+- [@SKILL.md (5k)](https://hackmd.io/8buIJaQ5TD2HtSEz9eo3pg)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
 - @anima/memory/DREAM.md (700)
@@ -25,8 +25,8 @@ requiredFiles:
 
 ## requiredSkills (34k)
 - [@../dev-typescript/SKILL.md (8k)](https://hackmd.io/6wuVIJ5cQC21FaGpB-irYg)
-  - [@SKILL.md (5k)](https://hackmd.io/j6cieQ5IRj6SNgqingxOCQ)
+  - [@SKILL.md (5k)](https://hackmd.io/8buIJaQ5TD2HtSEz9eo3pg)
 - [@../lib-1password/SKILL.md (3k)](https://hackmd.io/p4SYLbb2Q46I-ajQH8jeyg)
-- [@../lib-log/SKILL.md (11k)](https://hackmd.io/L1kMcFETTF2fn2vNlXKvgg)
-  - [@../lib-log/README.md (2k)](https://hackmd.io/pP_noT1DSaOFhQY2YptApg)
+- [@../lib-log/SKILL.md (11k)](https://hackmd.io/TfL9-4aXSaifhpda-90-RA)
+  - [@../lib-log/README.md (2k)](https://hackmd.io/OoPQgCMKTxmIpjtp6apIHA)
 - [@../edit-skill/SKILL.md (5k)](https://hackmd.io/KP6XTElkQXuNXale7a0AOQ)
