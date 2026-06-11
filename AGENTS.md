@@ -13,7 +13,7 @@ PRIMARY: SKILL.md (5k) - How to use; self-contained
 - @CONTRIBUTING.md (600) - How to develop/maintain
 - @package.json (500) - Dependencies, scripts, project metadata
 - @anima/memory/DREAM.md (700) - Aggregated agent memory ($anima-memory)
-- @anima/memory/PENDING.md (1.2k) - Uncurated diary entries since last dream curation ($anima-memory)
+- @anima/memory/PENDING.md (300) - Uncurated diary entries since last dream curation ($anima-memory)
 
 All other files below are supporting context from dependencies.
 
@@ -114,6 +114,7 @@ Default runtime is Bun direct-from-`src/`. Exception: packages exporting symbols
     - Global Setup for Vitest
     - Exercising `bun:ffi`/`bun:sqlite` from Vitest Tests: Shell Out to `bun -e`; Banned: `bun --bun vitest` (2026-04)
     - CLI Wrapper Smoke Test: Required for Every `scripts/X` Wrapper
+    - Child Processes in Tests MUST Pass `timeout`; Banned: Untimed `spawnSync`/`execSync`/`execFileSync`/`Bun.spawnSync`
     - `critGuardCli` Structured-Exit Tests: Clean Up Process-Level State
     - Local Rule Package Smoke Test: Use Real `eslint --config`
     - Definition of Done: Work Is NOT Done Until `bun run test` Has Been Run
@@ -505,20 +506,21 @@ Every TypeScript port that ships a `scripts/X` bash wrapper MUST include at leas
 
 Use `execFileSync('<scriptname>', ['--help'])` or another non-destructive flag, then match output with a regex or `expect(...).toContain(...)`. The smoke test must be reachable through the associated `$dev-test`-registered `package.json` test script. This catches failures that `src/lib` unit tests miss: missing `bun install`, broken `install-on-missing-deps`, Bun shebang resolution, and module-load errors.
 
-When using synchronous `spawnSync()` or `execFileSync()` in Vitest tests, pass a child-process timeout so a child hang fails at the test boundary instead of blocking the JS thread until the outer `dt` budget kills the suite. This applies to wrapper smoke tests and dynamic CLI-dispatch tests.
-
 Prefer non-destructive getter calls such as `X --help`, `X list`, or `X status` over setters. Wrapper smoke tests run repeatedly, so a mutating smoke test is a footgun.
 
 `````typescript!
 import { execFileSync } from 'node:child_process';
 
 it('smokes the shipped wrapper', () => {
-  const output = execFileSync('scripts/X', ['--help'], { encoding: 'utf8' });
+  const output = execFileSync('scripts/X', ['--help'], { encoding: 'utf8', timeout: 10000 });
   expect(output).toContain('Usage:');
 });
 `````
 
 Run through the package test script when one exists; otherwise use `./node_modules/.bin/vitest`, never bare `vitest`.
+
+### Child Processes in Tests MUST Pass `timeout`; Banned: Untimed `spawnSync`/`execSync`/`execFileSync`/`Bun.spawnSync`
+Every synchronous child-process call in tests — `spawnSync()`, `execSync()`, `execFileSync()`, and `Bun.spawnSync()` — MUST pass an explicit `timeout` (10000-30000ms; ~2x the slowest observed run) so a hung child fails at the call site instead of blocking the JS thread until the outer `dt`/Vitest budget kills the suite. Applies to wrapper smoke tests, dynamic CLI-dispatch tests, e2e CLI helpers, and `bun -e` contract shells; shared `_run()`-style helpers set the timeout once for every caller.
 
 ### `critGuardCli` Structured-Exit Tests: Clean Up Process-Level State
 Tests that exercise `critGuardCli` or `[EXIT/4]` / `[EXIT/5]` branches must verify file-level cleanup, not only the caught throw. If the test installs temporary listeners, stubs logger shutdown, or catches a structured exit, restore that state in `afterEach` and run the whole file; passing individual assertions is not enough when leaked state makes the file red.
@@ -1931,8 +1933,8 @@ If no existing code path emits logs, the project needs lib-log integration first
 File: lib-utils/anima/memory/DREAM.md
 ================
 ---
-lastRan: 2026-05-21 04:32
 processedThrough: 2026-05-21 01:22
+lastRan: 2026-06-11 03:32
 ---
 
 # Memory
@@ -1940,19 +1942,20 @@ processedThrough: 2026-05-21 01:22
 ## TABLE OF CONTENTS
 - Recent Sessions
 - Dependency and Installer Hygiene
-  - Prefer Fixing the Contract Over Improving the Display
-  - Smoke Help After Editing Bash Help Text
+    - Prefer Fixing the Contract Over Improving the Display
+    - Smoke Help After Editing Bash Help Text
 - Logging and Telemetry Contracts
-  - Preserve the Canonical Entry Logger Name
-  - Validate Telemetry Sweeps Against the Actual Scope
+    - Preserve the Canonical Entry Logger Name
+    - Validate Telemetry Sweeps Against the Actual Scope
 
 ## Recent Sessions
 - 2026-05-21
-  - [01:22] FIX- Validate CLI lifecycle telemetry sweep
-  - [00:57] Auto-normalize link- to github- in update-dependents
-  - [00:49] FIX- Drop cliLog from lib-utils SKILL.md; preserve canonical log name
+    - [01:22] FIX- Validate CLI lifecycle telemetry sweep
+    - [00:57] Auto-normalize link- to github- in update-dependents
+    - [00:49] FIX- Drop cliLog from lib-utils SKILL.md; preserve canonical log name
 
 ## Dependency and Installer Hygiene
+
 ### Prefer Fixing the Contract Over Improving the Display
 - (260521) When an output ambiguity points at a documented dependency-contract violation, fix the contract instead of making the display clever. The `update-dependents` confusion over `ok` versus GitHub SHA was solved by migrating `link:@mdr/lib-utils` consumers to `github:wsh-auto/lib-utils`, matching `SKILL.md`, not by teaching the script to explain the bad state.
 - (260521) `scripts/_LIB-UTILS_update-dependents` owns normalization from `link:@mdr/lib-utils` to `github:wsh-auto/lib-utils` for consumers. Keep lib-utils itself as the self-link exception; all ordinary consumers should install from GitHub and keep `@mdr/lib-log` / `@mdr/lib-1password` as optional local links when used.
@@ -1961,6 +1964,7 @@ processedThrough: 2026-05-21 01:22
 - (260521) `show_help` uses an expanding heredoc, so backticks, `$()` and `$VAR` inside help prose execute or expand unless deliberately escaped or rewritten. After editing help text, run the script's `--help` path; syntax checks do not catch heredoc expansion bugs.
 
 ## Logging and Telemetry Contracts
+
 ### Preserve the Canonical Entry Logger Name
 - (260521) The top-level CLI logger should be named `log`, including lifecycle timing examples such as `createLogger('my-project:cli', { timing: 'cli' })`. Secondary loggers can use role-specific names, but examples that rename the primary logger to `cliLog` teach the wrong convention and drift from `$mdr:lib-log`.
 
@@ -1975,43 +1979,25 @@ File: lib-utils/anima/memory/PENDING.md
 # Memory
 
 ## TABLE OF CONTENTS
-- 2026-05-21
-  - [01:22] FIX- Validate CLI lifecycle telemetry sweep
-  - [00:57] Auto-normalize link- to github- in update-dependents
-  - [00:49] FIX- Drop cliLog from lib-utils SKILL.md; preserve canonical log name
+- 2026-06-10
+  - [19:21] FIX- Refresh declarations and misuse tier
+  - [19:05] FIX- Add raw subprocess metadata to dependent updater logs
+  - [19:04] FIX-WAVE Lane A child-process timeouts
+  - [19:03] FIX- Lane C markdown title-case lint
 
-## 2026-05-21
-### [01:22] FIX- Validate CLI lifecycle telemetry sweep
-Validated the CLI lifecycle telemetry sweep for the lib-utils/lib-log timing migration. The only live source change from this session was the app-apple-notes CLI cleanup: the retired manual `Command completed` duration row was removed while the existing `createLogger(..., { timing: 'cli' })` remains the lifecycle owner. query-hackmd was reported as a candidate in stale context, but the current on-disk source was already clean.
+## 2026-06-10
+### [19:21] FIX- Refresh declarations and misuse tier
+Fixed audit lane K by regenerating consumer declaration JSDoc and changing update-dependents misuse paths/help from exit 2 to exit 4. Validation: build, lint, typecheck, unit tests, and bad-flag smoke passed.
 
-Validation proof for the two target packages: `bun run test` passed in query-hackmd (`dt` run 2026-05-21/01_14_11/0000) and app-apple-notes (`dt` run 2026-05-21/01_15_00/0000). Targeted retired-pattern grep found no remaining target-package manual exit-duration rows.
+### [19:05] FIX- Add raw subprocess metadata to dependent updater logs
+Updated the dependent updater's lib-log after-return rows so bun link and bun install rows include rawInput/rawOutput metadata while keeping payload bytes stripped.
+Verdict: confirmed
 
-Validation caught that the broader workspace sweep claim was incomplete. Root cause: I searched `*.ts` for `CLI invoked` and over-reported that as a workspace-wide result; the retired literal still exists outside TS, and docs still teach `Command completed` in app-apple-notes/query-hackmd CONTRIBUTING. Validation also found TS `:cli` logger calls without timing that require classification rather than blanket approval.
+### [19:04] FIX-WAVE Lane A child-process timeouts
+FIX-WAVE Lane A dev-typescript #15: added explicit child-process timeouts to assigned test subprocess calls in lib-utils. Scope was test/wrapper timeout only; no book push and no commits.
 
-Workflow correction from CTO: do not let stale wf-manage Gate 1 routing block a task when the user expects this pane to own the sweep. Treat the user's direct correction as approval and proceed with the work.
-
-Verdict: unproven
-Durable lesson: when supervision metadata is stale and the CTO clarifies ownership, execute the requested sweep directly; do not keep routing gates to absent panes.
-Durable lesson: sweep claims must match the exact file scope used by `rg`; if the plan says workspace, do not report a TS-only search as complete.
-Next agent should: finish or explicitly scope the remaining telemetry sweep findings: stale docs, non-TS `CLI invoked` literals, and secondary `:cli` logger calls missing timing.
-
-### [00:57] Auto-normalize link- to github- in update-dependents
-Patched scripts/_LIB-UTILS_update-dependents to auto-normalize link:@mdr/lib-utils specs to github:wsh-auto/lib-utils before install, per SKILL.md "lib-utils: always github: in dependencies". Verified end-to-end on user's 00:55 run: 4 violators (ops-watch, topic-pokemon-sleep, lib-models, app-obsidian) flipped and reinstalled at v1.5.2. Zero remaining link: violators across 85 consumers.
-
-Bug caught in self-review: backticks in --help description expanded as command substitution because show_help uses unquoted heredoc (cat <<EOF, not cat <<'EOF'). Fixed by dropping backticks from the description prose.
-
-Durable lesson: bash heredocs without single-quoted delimiters expand dollar-vars, dollar-paren, AND backticks. Inline code formatting via backticks must be escaped or rewritten to plain text. When editing a show_help block, run --help after editing as the smoke test -- syntax check alone won't catch heredoc expansion bugs.
-
-User's original confusion was over the script's display ("ok" for link: consumers vs SHA for github: consumers). Right fix per SKILL.md spec was migrating consumers off link:, not patching the display. Self-tell: when a display ambiguity maps cleanly onto a spec violation, prefer fixing the violation.
-
-### [00:49] FIX- Drop cliLog from lib-utils SKILL.md; preserve canonical log name
-Trivial doc fix in lib-utils/SKILL.md per CTO drift catch: the two-logger example introduced `cliLog` alongside canonical `log`, contradicting the convention that the main logger MUST be named `log` (per lib-log SKILL.md "Naming convention: Main logger must be named `log`."). Collapsed to one `log = createLogger('my-project:cli', { timing: 'cli' })` so the lifecycle-timing demo uses the canonical name. Verified no `cliLog` consumers anywhere in skills/, wsh/, or tt/. Pushed to HackMD. CLAUDE.md auto-regen by ops-watch picked up the size delta.
-
-Verdict: APPROVE (lite). One-line doc edit, no code surface, no dependents, hackmd synced.
-
-Durable lesson: when adding multi-logger examples to demonstrate timing/subsystem variants, keep the primary entry logger named `log`; subsystem children should be named after their subsystem (`workerLog`, `daemonLog`) but the top-level CLI/entry logger stays canonical. Worth surfacing back into lib-log or lib-utils SKILL.md if more multi-logger examples accumulate.
-
-Next agent should: nothing — closed.
+### [19:03] FIX- Lane C markdown title-case lint
+Fixed audit fix-wave Lane C markdown title-case findings in SKILL.md and CONTRIBUTING.md, including the synced SKILL.md TOC.
 
 ================
 File: lib-utils/scripts/_LIB-UTILS_update-dependents
@@ -2075,7 +2061,7 @@ ${CYAN}EXAMPLES${NC}
 
 ${CYAN}INVALID ARGUMENTS${NC}
     Unknown options and agent-context misuse print the error, this help text,
-    and ${DIM}Hint: _LIB-UTILS_update-dependents --help${NC}, then exit 2.
+    and ${DIM}Hint: _LIB-UTILS_update-dependents --help${NC}, then exit 4.
 
 ${DIM}AGENTS: MUST load \$mdr:lib-utils before editing or for context${NC}
 EOF
@@ -2096,7 +2082,7 @@ usage_error() {
     echo
     echo "Hint: _LIB-UTILS_update-dependents --help"
   } >&2
-  exit 2
+  exit 4
 }
 
 for arg in "$@"; do
@@ -2141,6 +2127,25 @@ _liblog_after_return() {
     ctx=$(jq -c --arg k "$1" --arg v "$2" '. + {($k): $v}' <<<"$ctx" 2>/dev/null || echo "$ctx")
     shift 2
   done
+  ctx=$(jq -c '
+    . + {
+      rawInput: {
+        method: .method,
+        path: .path,
+        command: (.command // .method),
+        package: .pkg,
+        body: null
+      },
+      rawOutput: {
+        outcome: .outcome,
+        status: (.status // null),
+        elapsedMs: (.elapsedMs // null),
+        version: (.version // null),
+        error: (.error // null),
+        body: {payloadStripped: true}
+      }
+    }
+  ' <<<"$ctx" 2>/dev/null || echo "$ctx")
   LIBLOG_CONTEXT_JSON="$ctx" liblog_emit "$level" "$message"
 }
 
@@ -2201,12 +2206,12 @@ bootstrap_links() {
     fi
     if (cd "$src" && bun link >/dev/null 2>&1); then
       _liblog_after_return info "link bun link ${pkg}: ok" \
-        method "bun-link" path "$src" outcome "ok" pkg "$pkg"
+        method "bun-link" command "bun link" path "$src" outcome "ok" pkg "$pkg"
       printf "  ${GREEN}✓${NC} %s ${DIM}%s${NC}\n" "$pkg" "${src/#$HOME/~}"
       ((registered++)) || true
     else
       _liblog_after_return error "link bun link ${pkg}: failed" \
-        method "bun-link" path "$src" outcome "failed" pkg "$pkg"
+        method "bun-link" command "bun link" path "$src" outcome "failed" pkg "$pkg"
       printf "  ${RED}✗${NC} %s ${DIM}bun link failed${NC}\n" "$pkg"
       ((failed++)) || true
     fi
@@ -2359,7 +2364,7 @@ update_project() {
     local version
     version=$(echo "$output" | grep -o '@mdr/lib-utils@github:wsh-auto/lib-utils#[a-f0-9]*' | head -1 | sed 's/.*#//' | cut -c1-7)
     _liblog_after_return info "install bun run with-lock:install ${short_path}: ok (${elapsed_ms}ms)" \
-      method "bun-install" path "$dir" outcome "ok" elapsedMs "$elapsed_ms" version "${version:-ok}"
+      method "bun-install" command "bun run with-lock:install" path "$dir" outcome "ok" elapsedMs "$elapsed_ms" version "${version:-ok}"
     if $JSON; then
       jq -cn --arg path "$dir" --arg version "${version:-ok}" '{path:$path,ok:true,version:$version}' >> "$RESULT_FILE"
     else
@@ -2370,7 +2375,7 @@ update_project() {
     local err_msg
     err_msg=$(echo "$output" | grep -i -E 'error|fail' | head -1 | cut -c1-50)
     _liblog_after_return error "install bun run with-lock:install ${short_path}: failed (${elapsed_ms}ms)" \
-      method "bun-install" path "$dir" outcome "failed" elapsedMs "$elapsed_ms" status "$exit_code" error "${err_msg:-failed}"
+      method "bun-install" command "bun run with-lock:install" path "$dir" outcome "failed" elapsedMs "$elapsed_ms" status "$exit_code" error "${err_msg:-failed}"
     if $JSON; then
       jq -cn --arg path "$dir" --arg error "${err_msg:-failed}" '{path:$path,ok:false,error:$error}' >> "$RESULT_FILE"
     else
@@ -2644,16 +2649,16 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (47.5k)
-## Documentation (7.9k)
+# lib-utils (46.8k)
+## Documentation (7.1k)
 - [@SKILL.md (5k)](https://hackmd.io/8buIJaQ5TD2HtSEz9eo3pg)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
 - @anima/memory/DREAM.md (700)
-- @anima/memory/PENDING.md (1.2k)
+- @anima/memory/PENDING.md (300)
 
-## Code (5.6k)
-- @scripts/_LIB-UTILS_update-dependents (3.4k)
+## Code (5.7k)
+- @scripts/_LIB-UTILS_update-dependents (3.5k)
 - @src/env.ts (700)
 - @src/logger.ts (1.5k)
 
@@ -2693,7 +2698,7 @@ lib-utils/
 2. **dist/** - Clean declaration files generated by `tsc`. These don't contain the problematic imports (TypeScript inlines the types).
 3. **Consumers** import from `dist/*.d.ts` (via package.json `exports.types`), which `skipLibCheck: true` ignores.
 
-### tsconfig Structure
+### Tsconfig Structure
 **Critical:** Bun uses tsconfig.json `paths` for runtime module resolution, not just TypeScript compilation. Stubs must only be in build config.
 
 | File | Purpose | Has paths? |
@@ -2822,14 +2827,14 @@ Utilities that enhance development but gracefully degrade in CI environments.
     - Logging Policy
     - Browser - createLogger(project-name)
     - Querying Logs: `ax` CLI
-- helpers / bunWrite()
-- helpers / runLogged()
-- helpers / sendKillLogged()
-- helpers / execWithLog()
-- helpers / measurePhase()
-- helpers / agentSandboxDir()
-- helpers / critical-guard()
-- lib-1password / env.ts - initEnv(callerDir, skipIfEnvVars?, log?)
+- Helpers / bunWrite()
+- Helpers / runLogged()
+- Helpers / sendKillLogged()
+- Helpers / execWithLog()
+- Helpers / measurePhase()
+- Helpers / agentSandboxDir()
+- Helpers / Critical-Guard()
+- lib-1password / env.ts - initEnv(callerDir, skipIfEnvVars?, Log?)
 - Scripts
 
 ## Installation
@@ -2989,7 +2994,7 @@ ax --all-hosts              # Logs from every machine (default: caller hostname 
 
 See `$mdr:lib-log` for full ax documentation including APL passthrough.
 
-## helpers / bunWrite()
+## Helpers / bunWrite()
 
 `````typescript!
 import { bunWrite } from '@mdr/lib-utils/helpers';
@@ -3005,7 +3010,7 @@ Use `bunWrite()` for any CLI `--json` branch (or other large stdout/stderr emit)
 - Implementation lives in `@mdr/lib-helpers` (pure, no optional deps), but consumers import this helper from `@mdr/lib-utils/helpers`.
 - Under-the-hood mechanism, refuted alternatives, and the original investigation are documented in `~/mnt/plans/tidy-weaving-hellman.md` (`hackmd: g5bQPS4yT0yMooinFuJLNQ`).
 
-## helpers / runLogged()
+## Helpers / runLogged()
 
 `````typescript!
 import { runLogged, runLoggedSync } from '@mdr/lib-utils/helpers';
@@ -3021,11 +3026,11 @@ Use `runLoggedSync(file, args, opts)` or `await runLogged(file, args, opts)` for
 
 Implementation lives in `@mdr/lib-helpers`; consumer packages import the stable re-export from `@mdr/lib-utils/helpers`.
 
-## helpers / sendKillLogged()
+## Helpers / sendKillLogged()
 
 Import `sendKillLogged` from `@mdr/lib-utils/helpers` for any TypeScript code that sends process-terminating signals. It logs `{ from, signal, pid, sent }`, treats signal `0` as an unlogged probe, and is ESRCH-safe.
 
-## helpers / execWithLog()
+## Helpers / execWithLog()
 
 `````typescript!
 import { execWithLog } from '@mdr/lib-utils/helpers';
@@ -3040,7 +3045,7 @@ Use `execWithLog()` for synchronous subprocess calls with timeout budgets.
 - Non-timeout subprocess failures rethrow unchanged.
 - Implementation lives in `@mdr/lib-helpers`; consumer packages import the stable re-export from `@mdr/lib-utils/helpers`.
 
-## helpers / measurePhase()
+## Helpers / measurePhase()
 
 `````typescript!
 import { measurePhase, measurePhaseSync } from '@mdr/lib-utils/helpers';
@@ -3048,10 +3053,10 @@ import { measurePhase, measurePhaseSync } from '@mdr/lib-utils/helpers';
 
 Use `measurePhase(phase, asyncFn, { log? })` or `measurePhaseSync(phase, fn, { log? })` for wall-clock-only phase timing. Both emit `log.debug('phase elapsed', { phase, wallMs })` from a `finally` block, so thrown errors still propagate after the timing row. CPU and event-loop dimensions belong in `deathWatch.measure` for daemon code.
 
-## helpers / agentSandboxDir()
+## Helpers / agentSandboxDir()
 Import `agentSandboxDir` and `AGENT_SANDBOX_ROOT` from `@mdr/lib-utils/helpers`. Use the stable default for named reusable test roots, `{ stable: false }` for mkdtemp-style ephemeral dirs, and `/private/tmp/agent-sandbox/<project>/<purpose>` for static config values that cannot call the helper.
 
-## helpers / critical-guard()
+## Helpers / Critical-Guard()
 Import `critGuardCli`, `critGuardDaemonLoop`, and sentinel helpers from `@mdr/lib-utils/helpers/critical-guard`.
 - `critGuardCli(fn, opts)` wraps CLI `_main()` entry points. It skips `[EXIT/4]` / `[EXIT/5]` structured exits, catches only JS-class trust-contract failures, and does not install death-watch.
 - `critGuardDaemonLoop(fn, opts)` wraps pmm-supervised daemon supervise loops. It catches the same JS-class failures and auto-installs death-watch by default.
@@ -3061,7 +3066,7 @@ Import `critGuardCli`, `critGuardDaemonLoop`, and sentinel helpers from `@mdr/li
 - SyntaxError convention: attach `err.cause = { inputPath, input }`; the helper logs `inputPath` and truncated `inputPreview`.
 - Daemon shutdown stays one-line: `await shutdown()` from `@mdr/lib-utils/logger` drains both Axiom and death-watch.
 
-## lib-1password / env.ts - initEnv(callerDir, skipIfEnvVars?, log?)
+## lib-1password / env.ts - initEnv(callerDir, skipIfEnvVars?, Log?)
 
 `````typescript!
 import { initEnv } from '@mdr/lib-utils/env';

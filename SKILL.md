@@ -24,14 +24,14 @@ Utilities that enhance development but gracefully degrade in CI environments.
     - Logging Policy
     - Browser - createLogger(project-name)
     - Querying Logs: `ax` CLI
-- helpers / bunWrite()
-- helpers / runLogged()
-- helpers / sendKillLogged()
-- helpers / execWithLog()
-- helpers / measurePhase()
-- helpers / agentSandboxDir()
-- helpers / critical-guard()
-- lib-1password / env.ts - initEnv(callerDir, skipIfEnvVars?, log?)
+- Helpers / bunWrite()
+- Helpers / runLogged()
+- Helpers / sendKillLogged()
+- Helpers / execWithLog()
+- Helpers / measurePhase()
+- Helpers / agentSandboxDir()
+- Helpers / Critical-Guard()
+- lib-1password / env.ts - initEnv(callerDir, skipIfEnvVars?, Log?)
 - Scripts
 
 ## Installation
@@ -191,7 +191,7 @@ ax --all-hosts              # Logs from every machine (default: caller hostname 
 
 See `$mdr:lib-log` for full ax documentation including APL passthrough.
 
-## helpers / bunWrite()
+## Helpers / bunWrite()
 
 `````typescript!
 import { bunWrite } from '@mdr/lib-utils/helpers';
@@ -207,7 +207,7 @@ Use `bunWrite()` for any CLI `--json` branch (or other large stdout/stderr emit)
 - Implementation lives in `@mdr/lib-helpers` (pure, no optional deps), but consumers import this helper from `@mdr/lib-utils/helpers`.
 - Under-the-hood mechanism, refuted alternatives, and the original investigation are documented in `~/mnt/plans/tidy-weaving-hellman.md` (`hackmd: g5bQPS4yT0yMooinFuJLNQ`).
 
-## helpers / runLogged()
+## Helpers / runLogged()
 
 `````typescript!
 import { runLogged, runLoggedSync } from '@mdr/lib-utils/helpers';
@@ -223,11 +223,11 @@ Use `runLoggedSync(file, args, opts)` or `await runLogged(file, args, opts)` for
 
 Implementation lives in `@mdr/lib-helpers`; consumer packages import the stable re-export from `@mdr/lib-utils/helpers`.
 
-## helpers / sendKillLogged()
+## Helpers / sendKillLogged()
 
 Import `sendKillLogged` from `@mdr/lib-utils/helpers` for any TypeScript code that sends process-terminating signals. It logs `{ from, signal, pid, sent }`, treats signal `0` as an unlogged probe, and is ESRCH-safe.
 
-## helpers / execWithLog()
+## Helpers / execWithLog()
 
 `````typescript!
 import { execWithLog } from '@mdr/lib-utils/helpers';
@@ -242,7 +242,7 @@ Use `execWithLog()` for synchronous subprocess calls with timeout budgets.
 - Non-timeout subprocess failures rethrow unchanged.
 - Implementation lives in `@mdr/lib-helpers`; consumer packages import the stable re-export from `@mdr/lib-utils/helpers`.
 
-## helpers / measurePhase()
+## Helpers / measurePhase()
 
 `````typescript!
 import { measurePhase, measurePhaseSync } from '@mdr/lib-utils/helpers';
@@ -250,10 +250,10 @@ import { measurePhase, measurePhaseSync } from '@mdr/lib-utils/helpers';
 
 Use `measurePhase(phase, asyncFn, { log? })` or `measurePhaseSync(phase, fn, { log? })` for wall-clock-only phase timing. Both emit `log.debug('phase elapsed', { phase, wallMs })` from a `finally` block, so thrown errors still propagate after the timing row. CPU and event-loop dimensions belong in `deathWatch.measure` for daemon code.
 
-## helpers / agentSandboxDir()
+## Helpers / agentSandboxDir()
 Import `agentSandboxDir` and `AGENT_SANDBOX_ROOT` from `@mdr/lib-utils/helpers`. Use the stable default for named reusable test roots, `{ stable: false }` for mkdtemp-style ephemeral dirs, and `/private/tmp/agent-sandbox/<project>/<purpose>` for static config values that cannot call the helper.
 
-## helpers / critical-guard()
+## Helpers / Critical-Guard()
 Import `critGuardCli`, `critGuardDaemonLoop`, and sentinel helpers from `@mdr/lib-utils/helpers/critical-guard`.
 - `critGuardCli(fn, opts)` wraps CLI `_main()` entry points. It skips `[EXIT/4]` / `[EXIT/5]` structured exits, catches only JS-class trust-contract failures, and does not install death-watch.
 - `critGuardDaemonLoop(fn, opts)` wraps pmm-supervised daemon supervise loops. It catches the same JS-class failures and auto-installs death-watch by default.
@@ -263,7 +263,7 @@ Import `critGuardCli`, `critGuardDaemonLoop`, and sentinel helpers from `@mdr/li
 - SyntaxError convention: attach `err.cause = { inputPath, input }`; the helper logs `inputPath` and truncated `inputPreview`.
 - Daemon shutdown stays one-line: `await shutdown()` from `@mdr/lib-utils/logger` drains both Axiom and death-watch.
 
-## lib-1password / env.ts - initEnv(callerDir, skipIfEnvVars?, log?)
+## lib-1password / env.ts - initEnv(callerDir, skipIfEnvVars?, Log?)
 
 `````typescript!
 import { initEnv } from '@mdr/lib-utils/env';

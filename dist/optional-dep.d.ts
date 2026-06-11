@@ -13,5 +13,9 @@
  * Return true only when the error clearly identifies `optionalPkg` as
  * the missing target. Transitive-dep failures (where a different
  * package is the missing target) return false so the caller re-throws.
+ *
+ * @param err - Import failure value to classify.
+ * @param optionalPkg - Package name that is allowed to be absent.
+ * @returns True when `optionalPkg` itself is the missing dependency.
  */
 export declare function isOptionalDepMissing(err: unknown, optionalPkg: string): boolean;

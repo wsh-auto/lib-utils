@@ -57,7 +57,7 @@ ${CYAN}EXAMPLES${NC}
 
 ${CYAN}INVALID ARGUMENTS${NC}
     Unknown options and agent-context misuse print the error, this help text,
-    and ${DIM}Hint: _LIB-UTILS_update-dependents --help${NC}, then exit 2.
+    and ${DIM}Hint: _LIB-UTILS_update-dependents --help${NC}, then exit 4.
 
 ${DIM}AGENTS: MUST load \$mdr:lib-utils before editing or for context${NC}
 EOF
@@ -78,7 +78,7 @@ usage_error() {
     echo
     echo "Hint: _LIB-UTILS_update-dependents --help"
   } >&2
-  exit 2
+  exit 4
 }
 
 for arg in "$@"; do
@@ -123,6 +123,25 @@ _liblog_after_return() {
     ctx=$(jq -c --arg k "$1" --arg v "$2" '. + {($k): $v}' <<<"$ctx" 2>/dev/null || echo "$ctx")
     shift 2
   done
+  ctx=$(jq -c '
+    . + {
+      rawInput: {
+        method: .method,
+        path: .path,
+        command: (.command // .method),
+        package: .pkg,
+        body: null
+      },
+      rawOutput: {
+        outcome: .outcome,
+        status: (.status // null),
+        elapsedMs: (.elapsedMs // null),
+        version: (.version // null),
+        error: (.error // null),
+        body: {payloadStripped: true}
+      }
+    }
+  ' <<<"$ctx" 2>/dev/null || echo "$ctx")
   LIBLOG_CONTEXT_JSON="$ctx" liblog_emit "$level" "$message"
 }
 
@@ -183,12 +202,12 @@ bootstrap_links() {
     fi
     if (cd "$src" && bun link >/dev/null 2>&1); then
       _liblog_after_return info "link bun link ${pkg}: ok" \
-        method "bun-link" path "$src" outcome "ok" pkg "$pkg"
+        method "bun-link" command "bun link" path "$src" outcome "ok" pkg "$pkg"
       printf "  ${GREEN}✓${NC} %s ${DIM}%s${NC}\n" "$pkg" "${src/#$HOME/~}"
       ((registered++)) || true
     else
       _liblog_after_return error "link bun link ${pkg}: failed" \
-        method "bun-link" path "$src" outcome "failed" pkg "$pkg"
+        method "bun-link" command "bun link" path "$src" outcome "failed" pkg "$pkg"
       printf "  ${RED}✗${NC} %s ${DIM}bun link failed${NC}\n" "$pkg"
       ((failed++)) || true
     fi
@@ -341,7 +360,7 @@ update_project() {
     local version
     version=$(echo "$output" | grep -o '@mdr/lib-utils@github:wsh-auto/lib-utils#[a-f0-9]*' | head -1 | sed 's/.*#//' | cut -c1-7)
     _liblog_after_return info "install bun run with-lock:install ${short_path}: ok (${elapsed_ms}ms)" \
-      method "bun-install" path "$dir" outcome "ok" elapsedMs "$elapsed_ms" version "${version:-ok}"
+      method "bun-install" command "bun run with-lock:install" path "$dir" outcome "ok" elapsedMs "$elapsed_ms" version "${version:-ok}"
     if $JSON; then
       jq -cn --arg path "$dir" --arg version "${version:-ok}" '{path:$path,ok:true,version:$version}' >> "$RESULT_FILE"
     else
@@ -352,7 +371,7 @@ update_project() {
     local err_msg
     err_msg=$(echo "$output" | grep -i -E 'error|fail' | head -1 | cut -c1-50)
     _liblog_after_return error "install bun run with-lock:install ${short_path}: failed (${elapsed_ms}ms)" \
-      method "bun-install" path "$dir" outcome "failed" elapsedMs "$elapsed_ms" status "$exit_code" error "${err_msg:-failed}"
+      method "bun-install" command "bun run with-lock:install" path "$dir" outcome "failed" elapsedMs "$elapsed_ms" status "$exit_code" error "${err_msg:-failed}"
     if $JSON; then
       jq -cn --arg path "$dir" --arg error "${err_msg:-failed}" '{path:$path,ok:false,error:$error}' >> "$RESULT_FILE"
     else

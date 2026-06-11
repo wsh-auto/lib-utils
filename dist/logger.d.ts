@@ -54,6 +54,8 @@ export declare function createLogger(name: string, options?: LoggerOptions): Log
  * The Node-stream drain loop below remains useful in the Node-runtime fallback
  * and for in-flight buffered writes that Bun exposes through the Node-compat
  * stream shim.
+ *
+ * @returns Resolves after available logger and stdout drains complete.
  */
 export declare function shutdown(): Promise<void>;
 export {};
