@@ -12,8 +12,8 @@ PRIMARY: SKILL.md (5k) - How to use; self-contained
 ## Other Documentation
 - @CONTRIBUTING.md (600) - How to develop/maintain
 - @package.json (500) - Dependencies, scripts, project metadata
-- @anima/memory/DREAM.md (700) - Aggregated agent memory ($anima-memory)
-- @anima/memory/PENDING.md (300) - Uncurated diary entries since last dream curation ($anima-memory)
+- @anima/memory/DREAM.md (1.4k) - Aggregated agent memory ($anima-memory)
+- @anima/memory/PENDING.md (800) - Uncurated diary entries since last dream curation ($anima-memory)
 
 All other files below are supporting context from dependencies.
 
@@ -1027,6 +1027,8 @@ Applies to every item and field in vault `wsh`, whether created via `op item cre
 
 Carve-out: when the owning skill IS the vendor integration (e.g. `query-cloudinary` owns `CLOUDINARY_*`), vendor- and owner-prefix coincide — vendor naming wins.
 
+For multi-field item edits, prefer `op item edit --template=<tmpfile>`. Banned: piping edit templates through `execFileSync`/`runLoggedSync` stdin for `op item edit`; the command can exit 0 without changing the item. After edits, re-read the item and verify target fields changed by presence or hash, never by printing secret values.
+
 ### Preferred Pattern: Template + Lazy Inject
 For scripts that need secrets, use `op inject` to generate `.env` from a template on first run.
 
@@ -1933,8 +1935,8 @@ If no existing code path emits logs, the project needs lib-log integration first
 File: lib-utils/anima/memory/DREAM.md
 ================
 ---
-processedThrough: 2026-05-21 01:22
-lastRan: 2026-06-11 03:32
+lastRan: 2026-06-12 04:31
+processedThrough: 2026-06-11 12:46
 ---
 
 # Memory
@@ -1943,12 +1945,24 @@ lastRan: 2026-06-11 03:32
 - Recent Sessions
 - Dependency and Installer Hygiene
     - Prefer Fixing the Contract Over Improving the Display
+    - Restore Tracked Artifacts After Failed Regeneration
     - Smoke Help After Editing Bash Help Text
+- Build and Test Surface Hygiene
+    - Regenerate Declarations After Public Surface Changes
+    - Keep Child-Process Tests Timed at the Call Site
 - Logging and Telemetry Contracts
     - Preserve the Canonical Entry Logger Name
+    - Preserve Raw Subprocess Metadata in After-Return Rows
     - Validate Telemetry Sweeps Against the Actual Scope
 
 ## Recent Sessions
+- 2026-06-11
+    - [12:46] RCA- bun.lock delete-re-add commit churn from update-dependents rm without restore
+- 2026-06-10
+    - [19:21] FIX- Refresh declarations and misuse tier
+    - [19:05] FIX- Add raw subprocess metadata to dependent updater logs
+    - [19:04] FIX-WAVE Lane A child-process timeouts
+    - [19:03] FIX- Lane C markdown title-case lint
 - 2026-05-21
     - [01:22] FIX- Validate CLI lifecycle telemetry sweep
     - [00:57] Auto-normalize link- to github- in update-dependents
@@ -1960,13 +1974,29 @@ lastRan: 2026-06-11 03:32
 - (260521) When an output ambiguity points at a documented dependency-contract violation, fix the contract instead of making the display clever. The `update-dependents` confusion over `ok` versus GitHub SHA was solved by migrating `link:@mdr/lib-utils` consumers to `github:wsh-auto/lib-utils`, matching `SKILL.md`, not by teaching the script to explain the bad state.
 - (260521) `scripts/_LIB-UTILS_update-dependents` owns normalization from `link:@mdr/lib-utils` to `github:wsh-auto/lib-utils` for consumers. Keep lib-utils itself as the self-link exception; all ordinary consumers should install from GitHub and keep `@mdr/lib-log` / `@mdr/lib-1password` as optional local links when used.
 
+### Restore Tracked Artifacts After Failed Regeneration
+- (260612) Script flows that delete a tracked artifact before regenerating it must snapshot and restore that artifact on every failure or interrupt path. `scripts/_LIB-UTILS_update-dependents` can leave `bun.lock` deleted when `with-lock:install`, SSH delegation, Bun install, or Ctrl-C fails between the removal and regeneration, and downstream commit sweeps then immortalize the transient deletion as delete/re-add churn.
+- (260612) For lockfile churn RCA, compare artifact mtimes against commit timestamps before trusting a clean-run model. A later successful updater run can regenerate the file in the same pass while the deletion being committed came from an earlier unlogged failed or interrupted run.
+
 ### Smoke Help After Editing Bash Help Text
 - (260521) `show_help` uses an expanding heredoc, so backticks, `$()` and `$VAR` inside help prose execute or expand unless deliberately escaped or rewritten. After editing help text, run the script's `--help` path; syntax checks do not catch heredoc expansion bugs.
+
+## Build and Test Surface Hygiene
+
+### Regenerate Declarations After Public Surface Changes
+- (260610) Source edits that affect consumer-facing signatures or JSDoc are incomplete until `dist/*.d.ts` is regenerated and checked. lib-utils consumers install from `github:` and read committed declarations, so source-only greens can still ship stale docs/types to downstream packages.
+- (260610) Misuse and bad-flag paths are part of the CLI contract, not just help text. When changing usage errors, smoke the invalid path and verify the structured exit tier matches the documented contract.
+
+### Keep Child-Process Tests Timed at the Call Site
+- (260610) Every lib-utils test helper or wrapper smoke that shells out must carry an explicit timeout at the subprocess call site. Outer harness budgets do not prove which child hung, and timeout-less helpers let one missed call evade the package policy.
 
 ## Logging and Telemetry Contracts
 
 ### Preserve the Canonical Entry Logger Name
 - (260521) The top-level CLI logger should be named `log`, including lifecycle timing examples such as `createLogger('my-project:cli', { timing: 'cli' })`. Secondary loggers can use role-specific names, but examples that rename the primary logger to `cliLog` teach the wrong convention and drift from `$mdr:lib-log`.
+
+### Preserve Raw Subprocess Metadata in After-Return Rows
+- (260610) Dependent-updater subprocess telemetry should keep payload-stripped `rawInput` and `rawOutput` metadata for `bun link` and `bun install` rows. The row must preserve method, command/path, outcome, elapsed time, status/version/error, and a clear payload-stripped marker so Axiom has provider-style after-return evidence without storing large process output.
 
 ### Validate Telemetry Sweeps Against the Actual Scope
 - (260521) Sweep claims must match the exact file scope used by `rg`. A TypeScript-only search is not proof of a workspace-wide telemetry migration, especially when retired literals can remain in bash, docs, or other surfaces.
@@ -1979,25 +2009,28 @@ File: lib-utils/anima/memory/PENDING.md
 # Memory
 
 ## TABLE OF CONTENTS
-- 2026-06-10
-  - [19:21] FIX- Refresh declarations and misuse tier
-  - [19:05] FIX- Add raw subprocess metadata to dependent updater logs
-  - [19:04] FIX-WAVE Lane A child-process timeouts
-  - [19:03] FIX- Lane C markdown title-case lint
+- 2026-06-11
+  - [12:46] RCA- bun.lock delete-re-add commit churn from update-dependents rm without restore
 
-## 2026-06-10
-### [19:21] FIX- Refresh declarations and misuse tier
-Fixed audit lane K by regenerating consumer declaration JSDoc and changing update-dependents misuse paths/help from exit 2 to exit 4. Validation: build, lint, typecheck, unit tests, and bad-flag smoke passed.
+## 2026-06-11
+### [12:46] RCA- bun.lock delete-re-add commit churn from update-dependents rm without restore
+User asked why bun.lock keeps getting deleted and re-added across commits (seen in lib-utils, via mc/com sweeps).
 
-### [19:05] FIX- Add raw subprocess metadata to dependent updater logs
-Updated the dependent updater's lib-log after-return rows so bun link and bun install rows include rawInput/rawOutput metadata while keeping payload bytes stripped.
-Verdict: confirmed
+RCA chain (each step verified, not guessed):
+1. First hypothesis ("ccsync --full deletes bun.lock, later install re-adds it") was incomplete — user correctly challenged that `_LIB-UTILS_update-dependents` runs `bun run with-lock:install` immediately after `rm -f bun.lock bun.lockb` (line ~342), so a clean run regenerates the lockfile in the same pass.
+2. Hard evidence settled the timeline: deletion commit 61bc975 (lib-utils, 2026-06-11 12:04) predates that day's ccsync --full run (installs 12:06:27-12:06:36, lib-utils ok 568ms, bun.lock mtime 12:06:33 matches). So the file was already missing at commit time, deleted by an earlier UNLOGGED run — the updater only gained lib-log rows in the script edit committed at 12:04, so Axiom (36h, --all-hosts) showing exactly one run proves nothing about older runs.
+3. Structural hole: `update_project()` rm's the lockfile unconditionally and instantly, but on install failure just logs a one-line ✗ and continues — it never restores the lockfile. Failure classes: (a) with-lock shared-lock wait timeout (LOCK_WAIT_SECONDS=180; parallel MAX_JOBS dependents all queue on one lock — fine when installs are ~1s, exceeded on --clean NFS reinstalls), (b) SSH delegation from m3/m4 (ConnectTimeout=10, host offline/auth), (c) bun install itself (github:wsh-auto/lib-utils fetch, broken per-machine bun link state, NFS ESTALE/hash), (d) Ctrl-C/kill with up to MAX_JOBS projects inside the rm->install window.
+4. Cycle: failed/interrupted run leaves bun.lock deleted -> next mc/mmc sweep commits the deletion -> next clean ccsync --full regenerates -> next sweep commits the re-add. Identical 51402-byte Bin churn in history (b55d443 add, 61bc975 delete, e9112d7 re-add) confirms content never actually changed.
 
-### [19:04] FIX-WAVE Lane A child-process timeouts
-FIX-WAVE Lane A dev-typescript #15: added explicit child-process timeouts to assigned test subprocess calls in lib-utils. Scope was test/wrapper timeout only; no book push and no commits.
+Techniques that worked:
+- bun.lock mtime vs commit timestamps was the decisive discriminator between "script doesn't reinstall" and "file was already missing".
+- ax default host filter hides cross-machine runs; --all-hosts before concluding "only one run".
+- Logging added in the same commit as the symptom means earlier history is dark — say so explicitly instead of overclaiming the negative.
 
-### [19:03] FIX- Lane C markdown title-case lint
-Fixed audit fix-wave Lane C markdown title-case findings in SKILL.md and CONTRIBUTING.md, including the synced SKILL.md TOC.
+Proposed fix (offered, not yet approved): in update_project(), snapshot bun.lock before the rm and restore it in the failure branch plus an EXIT trap, so a finished-or-killed run can never leave the lockfile deleted.
+
+Durable lesson: a script that deletes a tracked artifact and regenerates it later must restore the artifact on every failure/interrupt path; otherwise downstream commit sweeps (mc/mmc) immortalize the transient deleted state as delete/re-add commit churn.
+Next agent should: if CTO approves, implement snapshot-and-restore of bun.lock in _LIB-UTILS_update-dependents update_project() (failure branch + EXIT trap), then smoke a forced-failure install to prove the lockfile survives.
 
 ================
 File: lib-utils/scripts/_LIB-UTILS_update-dependents
@@ -2649,13 +2682,13 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (46.8k)
-## Documentation (7.1k)
+# lib-utils (48k)
+## Documentation (8.2k)
 - [@SKILL.md (5k)](https://hackmd.io/8buIJaQ5TD2HtSEz9eo3pg)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
-- @anima/memory/DREAM.md (700)
-- @anima/memory/PENDING.md (300)
+- @anima/memory/DREAM.md (1.4k)
+- @anima/memory/PENDING.md (800)
 
 ## Code (5.7k)
 - @scripts/_LIB-UTILS_update-dependents (3.5k)
