@@ -2,7 +2,7 @@
 name: lib-utils
 description: >-
   This skill should be used when projects need CI-safe utilities that work in both dev and CI without special setup. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Keywords: "@mdr/lib-utils", "_LIB-UTILS_update-dependents", "bunWrite", "runLogged", "execWithLog", "critical-guard", "Axiom", "1Password"
-hackmd: https://hackmd.io/8buIJaQ5TD2HtSEz9eo3pg
+hackmd: https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g
 ---
 
 # lib-utils
@@ -79,16 +79,14 @@ const log = createLogger('my-project:cli', { timing: 'cli' });
 log.critical('Build failed', { taskId: 'abc123' });
 log.info('Starting');
 log.error('Failed', { code: 500 });
-log.telemetry('Queue sample', { depth: 3 });
-log.trace('Polling tick');
 await log.flush();
 `````
 
 - If `@mdr/lib-log` installed: full Axiom logging (Winston-backed TypeScript; Python available via direct lib-log import)
-- If not + CI: console-based stub (`telemetry()` becomes a no-op; the other levels stay local)
+- If not + CI: console-based stub (extra levels become no-ops; the standard levels stay local)
 - If not + not CI: exit(1) with instructions to add to optionalDependencies
 
-**TypeScript levels:** `critical` (stderr+Axiom+Telegram escalation), `error`/`warn`/`info`/`debug` (stderr+Axiom), `telemetry` (Axiom-only), `trace` (stderr-only). Python stays on `debug`/`info`/`warn`/`error`.
+**TypeScript levels:** `critical` (stderr+Axiom+Telegram escalation), `error`/`warn`/`info`/`debug` (stderr+Axiom). Python stays on `debug`/`info`/`warn`/`error`. For the Axiom-only `telemetry` and stderr-only `trace` levels (permission-gated), see `$mdr:lib-log`.
 
 **Lifecycle timing:** TypeScript CLI and worker entrypoints declare lifecycle telemetry on their one entry logger: `createLogger('project:cli', { timing: 'cli' })` or `createLogger('project:worker', { timing: 'worker' })`. CLI timing stays top-level; set `skipAwaitShutdown = true` from any branch where the CLI should skip the drain and timing emit — typical cases include `--help`, `--version`, `--list-commands`, no-args-shows-help, unknown-subcommand-shows-help, and any `--dry-run` that prints and exits without doing real work. lib-log auto-emits `<type> boot` at logger creation and `<type> exit` from `shutdown()` with `{ wallMs, exitCode }`. Do not manually emit `log.debug('CLI invoked')`; that retired literal is no longer the contract.
 
@@ -116,6 +114,7 @@ await log.flush();
 **CLI logging policy:**
 - `stdout` - composable data only (JSON, IDs, paths, tables). Must contain nothing that wouldn't make sense piped to another program. Banned: `console.log` for progress/status messages.
 - `stderr` - everything useful for debugging later (state, status, progress, decisions, errors). MUST go through lib-log (`log.info`/`log.debug`/etc.), never via raw `console.error`. `log.*()` already writes to stderr via `StderrTransport` and also ships to Axiom, so `console.error` double-prints locally while bypassing structured logging and cloud persistence. For CLI catch blocks, use `log.warn()` for handled exits and `log.error()` for bug paths; see `$mdr:dev-core` for the single-exit pattern.
+- **Banned: bare `console.*` (`console.log`/`console.error`/`console.warn`/`console.info`) for ANY output.** Always route status/progress/diagnostics through `log.*` (lib-log); the only sanctioned stdout path is composable data via `bunWrite()`. When unsure, err toward `log.*`.
 - `--help`/`--version` - no need for logging
 - Lifecycle rows - declare `timing: 'cli' | 'worker'` on the entry logger; never manually log `CLI invoked`, argv dumps, or secrets
 - If per-item status is already printed, log per-item at `debug` and keep `info` for summaries and durable side effects

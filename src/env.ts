@@ -11,10 +11,11 @@
 import type { DotenvConfigOutput } from 'dotenv';
 import { isOptionalDepMissing } from './optional-dep.js';
 
-/** Logger interface - console and lib-log Logger both satisfy this. */
+/** Logger interface for lib-1password secret-loading failures. */
 interface Log {
   info(msg: string, ...args: unknown[]): void;
   error(msg: string, ...args: unknown[]): void;
+  critical(msg: string, context?: Record<string, unknown>): void;
 }
 
 /** Type matching lib-1password's initEnv signature. */
@@ -51,15 +52,21 @@ try {
   }
 }
 
+const consoleLog: Log = {
+  info: (msg, ...args) => console.info(msg, ...args),
+  error: (msg, ...args) => console.error(msg, ...args),
+  critical: (msg, context) => console.error(msg, context ?? ''),
+};
+
 /**
  * Initialize environment from .env.template using 1Password CLI.
  * Safe to use in CI environments where lib-1password may not be installed.
  *
  * @param callerDir - Any dir inside the package; pass `import.meta.dirname`
  * @param skipIfEnvVars - Skip injection if ALL these env vars are already set
- * @param log - Logger with info/error methods (defaults to console)
+ * @param log - Logger with info/error/critical methods (defaults to a console-backed adapter)
  * @returns { parsed: Record<string, string> } - The loaded/skipped env vars
  */
-export function initEnv(callerDir: string, skipIfEnvVars: string[] = [], log: Log = console): DotenvConfigOutput {
+export function initEnv(callerDir: string, skipIfEnvVars: string[] = [], log: Log = consoleLog): DotenvConfigOutput {
   return lib1p.initEnv(callerDir, skipIfEnvVars, log);
 }

@@ -1385,6 +1385,8 @@ await log.flush();
 - `trace` - stderr only
 - Python stays on `debug` / `info` / `warn` / `error`
 
+**`telemetry` and `trace` require explicit user permission.** Default to `debug`/`info`/`warn`/`error`. `telemetry` is Axiom-only (invisible on stderr) and `trace` is stderr-only (never reaches Axiom) — both drop data from one surface and are easy to misuse, so get user sign-off before adding either.
+
 ## Python
 Scripts, services, automation.
 
@@ -2467,10 +2469,11 @@ File: lib-utils/src/env.ts
 import type { DotenvConfigOutput } from 'dotenv';
 import { isOptionalDepMissing } from './optional-dep.js';
 
-/** Logger interface - console and lib-log Logger both satisfy this. */
+/** Logger interface for lib-1password secret-loading failures. */
 interface Log {
   info(msg: string, ...args: unknown[]): void;
   error(msg: string, ...args: unknown[]): void;
+  critical(msg: string, context?: Record<string, unknown>): void;
 }
 
 /** Type matching lib-1password's initEnv signature. */
@@ -2507,16 +2510,22 @@ try {
   }
 }
 
+const consoleLog: Log = {
+  info: (msg, ...args) => console.info(msg, ...args),
+  error: (msg, ...args) => console.error(msg, ...args),
+  critical: (msg, context) => console.error(msg, context ?? ''),
+};
+
 /**
  * Initialize environment from .env.template using 1Password CLI.
  * Safe to use in CI environments where lib-1password may not be installed.
  *
  * @param callerDir - Any dir inside the package; pass `import.meta.dirname`
  * @param skipIfEnvVars - Skip injection if ALL these env vars are already set
- * @param log - Logger with info/error methods (defaults to console)
+ * @param log - Logger with info/error/critical methods (defaults to a console-backed adapter)
  * @returns { parsed: Record<string, string> } - The loaded/skipped env vars
  */
-export function initEnv(callerDir: string, skipIfEnvVars: string[] = [], log: Log = console): DotenvConfigOutput {
+export function initEnv(callerDir: string, skipIfEnvVars: string[] = [], log: Log = consoleLog): DotenvConfigOutput {
   return lib1p.initEnv(callerDir, skipIfEnvVars, log);
 }
 
@@ -2682,17 +2691,17 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (48k)
-## Documentation (8.2k)
+# lib-utils (48.1k)
+## Documentation (8.3k)
 - [@SKILL.md (5k)](https://hackmd.io/8buIJaQ5TD2HtSEz9eo3pg)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
 - @anima/memory/DREAM.md (1.4k)
 - @anima/memory/PENDING.md (800)
 
-## Code (5.7k)
+## Code (5.8k)
 - @scripts/_LIB-UTILS_update-dependents (3.5k)
-- @src/env.ts (700)
+- @src/env.ts (800)
 - @src/logger.ts (1.5k)
 
 ## requiredSkills (34k)
@@ -2915,16 +2924,14 @@ const log = createLogger('my-project:cli', { timing: 'cli' });
 log.critical('Build failed', { taskId: 'abc123' });
 log.info('Starting');
 log.error('Failed', { code: 500 });
-log.telemetry('Queue sample', { depth: 3 });
-log.trace('Polling tick');
 await log.flush();
 `````
 
 - If `@mdr/lib-log` installed: full Axiom logging (Winston-backed TypeScript; Python available via direct lib-log import)
-- If not + CI: console-based stub (`telemetry()` becomes a no-op; the other levels stay local)
+- If not + CI: console-based stub (extra levels become no-ops; the standard levels stay local)
 - If not + not CI: exit(1) with instructions to add to optionalDependencies
 
-**TypeScript levels:** `critical` (stderr+Axiom+Telegram escalation), `error`/`warn`/`info`/`debug` (stderr+Axiom), `telemetry` (Axiom-only), `trace` (stderr-only). Python stays on `debug`/`info`/`warn`/`error`.
+**TypeScript levels:** `critical` (stderr+Axiom+Telegram escalation), `error`/`warn`/`info`/`debug` (stderr+Axiom). Python stays on `debug`/`info`/`warn`/`error`. For the Axiom-only `telemetry` and stderr-only `trace` levels (permission-gated), see `$mdr:lib-log`.
 
 **Lifecycle timing:** TypeScript CLI and worker entrypoints declare lifecycle telemetry on their one entry logger: `createLogger('project:cli', { timing: 'cli' })` or `createLogger('project:worker', { timing: 'worker' })`. CLI timing stays top-level; set `skipAwaitShutdown = true` from any branch where the CLI should skip the drain and timing emit — typical cases include `--help`, `--version`, `--list-commands`, no-args-shows-help, unknown-subcommand-shows-help, and any `--dry-run` that prints and exits without doing real work. lib-log auto-emits `<type> boot` at logger creation and `<type> exit` from `shutdown()` with `{ wallMs, exitCode }`. Do not manually emit `log.debug('CLI invoked')`; that retired literal is no longer the contract.
 
@@ -2952,6 +2959,7 @@ await log.flush();
 **CLI logging policy:**
 - `stdout` - composable data only (JSON, IDs, paths, tables). Must contain nothing that wouldn't make sense piped to another program. Banned: `console.log` for progress/status messages.
 - `stderr` - everything useful for debugging later (state, status, progress, decisions, errors). MUST go through lib-log (`log.info`/`log.debug`/etc.), never via raw `console.error`. `log.*()` already writes to stderr via `StderrTransport` and also ships to Axiom, so `console.error` double-prints locally while bypassing structured logging and cloud persistence. For CLI catch blocks, use `log.warn()` for handled exits and `log.error()` for bug paths; see `$mdr:dev-core` for the single-exit pattern.
+- **Banned: bare `console.*` (`console.log`/`console.error`/`console.warn`/`console.info`) for ANY output.** Always route status/progress/diagnostics through `log.*` (lib-log); the only sanctioned stdout path is composable data via `bunWrite()`. When unsure, err toward `log.*`.
 - `--help`/`--version` - no need for logging
 - Lifecycle rows - declare `timing: 'cli' | 'worker'` on the entry logger; never manually log `CLI invoked`, argv dumps, or secrets
 - If per-item status is already printed, log per-item at `debug` and keep `info` for summaries and durable side effects
