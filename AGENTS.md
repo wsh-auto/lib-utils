@@ -1297,7 +1297,7 @@ description: >-
   This skill should be used when adding centralized cloud logging to TypeScript and Python projects using Axiom or querying logs with the ax CLI. Provides dual output: colored console + JSON to Axiom. Keywords: "Axiom", "createLogger" Scripts: "ax"
 requiredFiles:
   - README.md
-hackmd: https://hackmd.io/TfL9-4aXSaifhpda-90-RA
+hackmd: https://hackmd.io/Qm0CJ-nOQ-Cwv03EJoL1Kg
 ---
 
 # lib-log
@@ -2693,7 +2693,7 @@ requiredFiles:
 
 # lib-utils (48.1k)
 ## Documentation (8.3k)
-- [@SKILL.md (5k)](https://hackmd.io/8buIJaQ5TD2HtSEz9eo3pg)
+- [@SKILL.md (5k)](https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
 - @anima/memory/DREAM.md (1.4k)
@@ -2706,9 +2706,9 @@ requiredFiles:
 
 ## requiredSkills (34k)
 - [@../dev-typescript/SKILL.md (8k)](https://hackmd.io/6wuVIJ5cQC21FaGpB-irYg)
-  - [@SKILL.md (5k)](https://hackmd.io/8buIJaQ5TD2HtSEz9eo3pg)
+  - [@SKILL.md (5k)](https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g)
 - [@../lib-1password/SKILL.md (3k)](https://hackmd.io/p4SYLbb2Q46I-ajQH8jeyg)
-- [@../lib-log/SKILL.md (11k)](https://hackmd.io/TfL9-4aXSaifhpda-90-RA)
+- [@../lib-log/SKILL.md (11k)](https://hackmd.io/Qm0CJ-nOQ-Cwv03EJoL1Kg)
   - [@../lib-log/README.md (2k)](https://hackmd.io/OoPQgCMKTxmIpjtp6apIHA)
 - [@../edit-skill/SKILL.md (5k)](https://hackmd.io/KP6XTElkQXuNXale7a0AOQ)
 
@@ -2847,7 +2847,7 @@ File: lib-utils/SKILL.md
 name: lib-utils
 description: >-
   This skill should be used when projects need CI-safe utilities that work in both dev and CI without special setup. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Keywords: "@mdr/lib-utils", "_LIB-UTILS_update-dependents", "bunWrite", "runLogged", "execWithLog", "critical-guard", "Axiom", "1Password"
-hackmd: https://hackmd.io/8buIJaQ5TD2HtSEz9eo3pg
+hackmd: https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g
 ---
 
 # lib-utils
