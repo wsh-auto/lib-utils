@@ -101,7 +101,7 @@ Default runtime is Bun direct-from-`src/`. Exception: packages exporting symbols
     - Path Comparison: Use `realpathSync()`; Banned: `resolve()` for Deduplication
     - Path Construction: Use `resolve()`; Banned: String Concatenation
     - Config Loaders: No Env Overrides of `config.yml` by Default
-    - CLI Argument Parsing: Use `minimist`; Banned: `args.includes()`, Manual Parsing
+    - CLI Argument Parsing: Use `@mdr/lib-argv`; Banned: Manual Parsing
     - CLI Table Output: TypeScript-Specific Patterns
     - CLI Design Principles
     - Code Style: Single-Line Preference
@@ -328,83 +328,12 @@ Note: `initEnv()` from `@mdr/lib-utils/env` does NOT need `resolve()` — it wal
 ### Config Loaders: No Env Overrides of `config.yml` by Default
 A TypeScript `config.{ts}` loader MUST NOT shape committed `config.yml` values from `process.env` — e.g. `const x = process.env.X ?? cfg.x` or `envVal ? { ...cfg, key: envVal } : cfg`. A stray shell export then silently changes shipped behavior. Add an env override only for a demonstrated runtime need (and justify it inline at the loader); secret/auth env vars (`*_API_KEY`, tokens) are credentials, not config, and are exempt. Full rule: `$dev-core` § "Banned: Env Vars Overriding `config.yml` Values by Default; Require Demonstrated Need".
 
-### CLI Argument Parsing: Use `minimist`; Banned: `args.includes()`, Manual Parsing
-**Always use `minimist` for command-line argument parsing.** Never use manual patterns like `args.includes()` or `args.find()`.
+### CLI Argument Parsing: Use `@mdr/lib-argv`; Banned: Manual Parsing
+Use `@mdr/lib-argv` for shared minimist contracts: closed-surface unknown-flag rejection, `stopEarly` free-form parsing, positional string normalization, kebab-case flag reads, boolean short-flag chains, agent-safe output guards, negative integer option values, and pass-through argv splitting.
 
-`````typescript!
-import minimist from 'minimist';
+Raw `minimist` is allowed only when the shared helper layer adds no value for that local surface. Never use manual patterns like `args.includes()`, `args.find()`, or `args.indexOf()` for CLI flag parsing.
 
-const parsed = minimist(args, {
-  boolean: ['force', 'json'],
-  string: ['output'],
-});
-
-const force = parsed.force;       // boolean
-const output = parsed.output;     // string
-const positionals = parsed._;     // (string | number)[] - see warning below!
-`````
-
-**Do NOT use the `alias` option.** Minimist stores aliased values in BOTH keys (e.g., `output` AND `o`), causing short aliases to leak into `...rest` spreads and get passed through to subprocesses.
-
-**Reject unknown flags for closed command surfaces.** After `minimist` parses, compare parsed option keys against the command's declared flags and fail on extras instead of forwarding unexpected args silently. Free-form text commands can use `stopEarly: true` when user text intentionally owns the remainder.
-
-**Use `stopEarly: true`** when parsing commands that accept free-form user text (prompts, messages) to preserve flags in that text:
-
-`````typescript!
-const parsed = minimist(args, {
-  string: ['cwd'],
-  stopEarly: true,  // Stops parsing after first positional
-});
-// "command -v --full text" → parsed._ = ['-v', '--full', 'text']
-`````
-
-**⚠️ Numeric positionals are converted to numbers:**
-
-`````bash!
-mycli 9      # parsed._ = [9] (number, NOT "9" string!)
-mycli 9:0    # parsed._ = ["9:0"] (string, has non-digit)
-`````
-
-Always convert positionals to strings when they represent identifiers:
-
-`````typescript!
-const ids = parsed._.map(String);     // ✅ Safe: ["9"]
-const ids = parsed._ as string[];     // ❌ Bug: typeof check fails on numbers
-`````
-
-**⚠️ Kebab-case flags are NOT auto-converted to camelCase:**
-
-`````bash!
-mycli --max-results 500   # args['max-results'] = 500, args.maxResults = undefined
-`````
-
-Minimist stores kebab-case flags under the exact key `'max-results'`, not `maxResults`. Use kebab-case in your minimist config to match CLI flags:
-
-`````typescript!
-const parsed = minimist(args, {
-  default: { 'max-results': 100 },  // ✅ Match CLI flag format
-});
-
-// ✅ Correct: read kebab-case key directly
-handleCommand({ maxResults: parsed['max-results'] });
-
-// ❌ Bug: camelCase key ignores user's --max-results flag
-handleCommand({ maxResults: parsed.maxResults });
-`````
-
-**Banned: `??` against minimist `boolean:` keys; use `||`.** Keys listed in minimist's `boolean:` config are always defined (`false` when absent, `true` when present) — never `null`/`undefined`. `??` only falls back on nullish, so `args.help ?? args.h` returns `false` when the long flag is absent, never trying the short alias; the short flag becomes dead. Use `||` so `false` falls through to the next operand.
-
-`````typescript!
-const parsed = minimist(args, { boolean: ['help', 'h', 'version', 'v'] });
-
-// ❌ Bug: false ?? rhs returns false → -h short flag never fires
-if (parsed.help ?? parsed.h) showHelp();
-
-// ✅ Correct: false || rhs falls through
-if (parsed.help || parsed.h) showHelp();
-`````
-
-Audit-sweep "modernizations" that blindly rewrite `||`→`??` across a file MUST skip any operand sourced from a minimist `boolean:` key — paired long/short flag chains (`parsed.help || parsed.h`) are the recurring trap.
+See `$mdr:lib-argv` for the detailed parsing norms and package API.
 
 ### CLI Table Output: TypeScript-Specific Patterns
 Canonical listing conventions (datetime, sort, limit semantics, filter footers, spacing, and truncation) live in `$mdr:lib-list`. See `$mdr:dev-core` § "Table Output" for the cross-language rule (use a table library; banned manual `padEnd`/`padStart`) and § "--json Support" for the shared-pipeline rule. TypeScript-specific `cli-table3` mechanics below.
