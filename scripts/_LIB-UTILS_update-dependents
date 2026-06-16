@@ -26,7 +26,7 @@ ${CYAN}USAGE${NC}
     ${BOLD}_LIB-UTILS_update-dependents${NC} [${YELLOW}OPTIONS${NC}]
 
 ${CYAN}DESCRIPTION${NC}
-    Scans ~/mnt for all package.json files containing @mdr/lib-utils,
+    Scans ~/mnt/{mdr,tt,wsh} for all package.json files containing @mdr/lib-utils,
     normalizes any link:@mdr/lib-utils specs to github:wsh-auto/lib-utils
     per SKILL.md, removes Bun lockfiles to clear pinned commits, and runs
     bun install to fetch the latest version from GitHub. Runs in parallel
@@ -236,7 +236,7 @@ if ! $SKIP_LINKS; then
 fi
 
 if ! $JSON; then
-  echo "${CYAN}Scanning ~/mnt for @mdr/lib-utils dependents...${NC}"
+  echo "${CYAN}Scanning ~/mnt/{mdr,tt,wsh} for @mdr/lib-utils dependents...${NC}"
 fi
 
 # Find workspace root (parent with "workspaces" in package.json), or return original dir
@@ -257,7 +257,7 @@ find_workspace_root() {
 
 # Find all package.json with lib-utils
 mapfile -t PJSONS < <(
-  rg -l '@mdr/lib-utils' ~/mnt --glob '**/package.json' --glob '!**/node_modules/**' --no-ignore --no-messages
+  rg -l '@mdr/lib-utils' ~/mnt/mdr ~/mnt/tt ~/mnt/wsh --glob '**/package.json' --glob '!**/node_modules/**' --glob '!**/.git/**' --glob '!**/dist/**' --no-ignore --no-messages
 )
 
 # Normalize any `link:@mdr/lib-utils` specs to `github:wsh-auto/lib-utils` per SKILL.md.
