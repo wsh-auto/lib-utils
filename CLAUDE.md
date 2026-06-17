@@ -10,13 +10,13 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (48.1k)
-## Documentation (8.3k)
+# lib-utils (47.9k)
+## Documentation (8k)
 - [@SKILL.md (5k)](https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
-- @anima/memory/DREAM.md (1.4k)
-- @anima/memory/PENDING.md (800)
+- @anima/memory/DREAM.md (1.5k)
+- @anima/memory/PENDING.md (400)
 
 ## Code (5.8k)
 - @scripts/_LIB-UTILS_update-dependents (3.5k)

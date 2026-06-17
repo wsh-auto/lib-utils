@@ -12,8 +12,8 @@ PRIMARY: SKILL.md (5k) - How to use; self-contained
 ## Other Documentation
 - @CONTRIBUTING.md (600) - How to develop/maintain
 - @package.json (500) - Dependencies, scripts, project metadata
-- @anima/memory/DREAM.md (1.4k) - Aggregated agent memory ($anima-memory)
-- @anima/memory/PENDING.md (800) - Uncurated diary entries since last dream curation ($anima-memory)
+- @anima/memory/DREAM.md (1.5k) - Aggregated agent memory ($anima-memory)
+- @anima/memory/PENDING.md (400) - Uncurated diary entries since last dream curation ($anima-memory)
 
 All other files below are supporting context from dependencies.
 
@@ -1866,8 +1866,8 @@ If no existing code path emits logs, the project needs lib-log integration first
 File: lib-utils/anima/memory/DREAM.md
 ================
 ---
-lastRan: 2026-06-12 04:31
-processedThrough: 2026-06-11 12:46
+lastRan: 2026-06-17 04:53
+processedThrough: 2026-06-16 13:28
 ---
 
 # Memory
@@ -1875,6 +1875,7 @@ processedThrough: 2026-06-11 12:46
 ## TABLE OF CONTENTS
 - Recent Sessions
 - Dependency and Installer Hygiene
+    - Scope Fleet Scans to Owned Roots
     - Prefer Fixing the Contract Over Improving the Display
     - Restore Tracked Artifacts After Failed Regeneration
     - Smoke Help After Editing Bash Help Text
@@ -1887,6 +1888,8 @@ processedThrough: 2026-06-11 12:46
     - Validate Telemetry Sweeps Against the Actual Scope
 
 ## Recent Sessions
+- 2026-06-16
+    - [13:28] FIX- rescope update-dependents discovery scan to satisfy scan-guard
 - 2026-06-11
     - [12:46] RCA- bun.lock delete-re-add commit churn from update-dependents rm without restore
 - 2026-06-10
@@ -1900,6 +1903,9 @@ processedThrough: 2026-06-11 12:46
     - [00:49] FIX- Drop cliLog from lib-utils SKILL.md; preserve canonical log name
 
 ## Dependency and Installer Hygiene
+
+### Scope Fleet Scans to Owned Roots
+- (260617) Fleet-wide `rg` / `fd` scans over `~/mnt` must use scoped roots such as `~/mnt/{mdr,tt,wsh}` plus explicit `node_modules`, `.git`, and `dist` excludes. A scan that passes through Homebrew `rg` is not proof it passes the PATH-first scan-guard wrapper, which rejects bare-root `~/mnt` scans.
 
 ### Prefer Fixing the Contract Over Improving the Display
 - (260521) When an output ambiguity points at a documented dependency-contract violation, fix the contract instead of making the display clever. The `update-dependents` confusion over `ok` versus GitHub SHA was solved by migrating `link:@mdr/lib-utils` consumers to `github:wsh-auto/lib-utils`, matching `SKILL.md`, not by teaching the script to explain the bad state.
@@ -1940,28 +1946,19 @@ File: lib-utils/anima/memory/PENDING.md
 # Memory
 
 ## TABLE OF CONTENTS
-- 2026-06-11
-  - [12:46] RCA- bun.lock delete-re-add commit churn from update-dependents rm without restore
+- 2026-06-16
+  - [13:28] FIX- rescope update-dependents discovery scan to satisfy scan-guard
 
-## 2026-06-11
-### [12:46] RCA- bun.lock delete-re-add commit churn from update-dependents rm without restore
-User asked why bun.lock keeps getting deleted and re-added across commits (seen in lib-utils, via mc/com sweeps).
+## 2026-06-16
+### [13:28] FIX- rescope update-dependents discovery scan to satisfy scan-guard
+`ccsync --full` was dying with exit 4 in panes where the cli-bash scan-guard wrapper (`~/mnt/.bin/rg`) is PATH-first. Root cause: `_LIB-UTILS_update-dependents:260` discovered dependents with `rg -l '@mdr/lib-utils' ~/mnt --no-ignore` (bare-root + only node_modules excluded), which the guard refuses (`bare-root`). Fix: scope to `~/mnt/mdr ~/mnt/tt ~/mnt/wsh` + add `!**/.git/**` `!**/dist/**` globs — matching the same three roots the script's link-bootstrap (line 163) already uses.
 
-RCA chain (each step verified, not guessed):
-1. First hypothesis ("ccsync --full deletes bun.lock, later install re-adds it") was incomplete — user correctly challenged that `_LIB-UTILS_update-dependents` runs `bun run with-lock:install` immediately after `rm -f bun.lock bun.lockb` (line ~342), so a clean run regenerates the lockfile in the same pass.
-2. Hard evidence settled the timeline: deletion commit 61bc975 (lib-utils, 2026-06-11 12:04) predates that day's ccsync --full run (installs 12:06:27-12:06:36, lib-utils ok 568ms, bun.lock mtime 12:06:33 matches). So the file was already missing at commit time, deleted by an earlier UNLOGGED run — the updater only gained lib-log rows in the script edit committed at 12:04, so Axiom (36h, --all-hosts) showing exactly one run proves nothing about older runs.
-3. Structural hole: `update_project()` rm's the lockfile unconditionally and instantly, but on install failure just logs a one-line ✗ and continues — it never restores the lockfile. Failure classes: (a) with-lock shared-lock wait timeout (LOCK_WAIT_SECONDS=180; parallel MAX_JOBS dependents all queue on one lock — fine when installs are ~1s, exceeded on --clean NFS reinstalls), (b) SSH delegation from m3/m4 (ConnectTimeout=10, host offline/auth), (c) bun install itself (github:wsh-auto/lib-utils fetch, broken per-machine bun link state, NFS ESTALE/hash), (d) Ctrl-C/kill with up to MAX_JOBS projects inside the rm->install window.
-4. Cycle: failed/interrupted run leaves bun.lock deleted -> next mc/mmc sweep commits the deletion -> next clean ccsync --full regenerates -> next sweep commits the re-add. Identical 51402-byte Bin churn in history (b55d443 add, 61bc975 delete, e9112d7 re-add) confirms content never actually changed.
+Validation caught the load-bearing risk: would scoping to three roots drop any dependent? Proven NO — full bare-`~/mnt` scan and 3-root scan both return 111 pkgs, `comm` diff empty. Every `@mdr/lib-utils` consumer lives under mdr/tt/wsh. Also tightened the `--help`/echo "Scans ~/mnt" prose to "Scans ~/mnt/{mdr,tt,wsh}" for precision.
 
-Techniques that worked:
-- bun.lock mtime vs commit timestamps was the decisive discriminator between "script doesn't reinstall" and "file was already missing".
-- ax default host filter hides cross-machine runs; --all-hosts before concluding "only one run".
-- Logging added in the same commit as the symptom means earlier history is dark — say so explicitly instead of overclaiming the negative.
+The bug only reproduces where the guard wrapper wins on PATH; on mbp the agent Bash tool resolves `rg` to `/opt/homebrew/bin/rg` (homebrew), which bypasses the guard — so the same command "worked" in one pane and exit-4'd in another. That PATH-bypass is a separate, larger workstream (close-the-bypass) owned by other panes.
 
-Proposed fix (offered, not yet approved): in update_project(), snapshot bun.lock before the rm and restore it in the failure branch plus an EXIT trap, so a finished-or-killed run can never leave the lockfile deleted.
-
-Durable lesson: a script that deletes a tracked artifact and regenerates it later must restore the artifact on every failure/interrupt path; otherwise downstream commit sweeps (mc/mmc) immortalize the transient deleted state as delete/re-add commit churn.
-Next agent should: if CTO approves, implement snapshot-and-restore of bun.lock in _LIB-UTILS_update-dependents update_project() (failure branch + EXIT trap), then smoke a forced-failure install to prove the lockfile survives.
+Verdict: confirmed
+Durable lesson: Any fleet-wide `rg`/`fd` over ~/mnt must use scoped roots (`~/mnt/{mdr,tt,wsh}`) + node_modules/.git/dist excludes, or it breaks under the scan-guard wrapper wherever ~/mnt/.bin wins on PATH. A scan that passes via homebrew rg is not proof it passes the guard.
 
 ================
 File: lib-utils/scripts/_LIB-UTILS_update-dependents
@@ -1994,7 +1991,7 @@ ${CYAN}USAGE${NC}
     ${BOLD}_LIB-UTILS_update-dependents${NC} [${YELLOW}OPTIONS${NC}]
 
 ${CYAN}DESCRIPTION${NC}
-    Scans ~/mnt for all package.json files containing @mdr/lib-utils,
+    Scans ~/mnt/{mdr,tt,wsh} for all package.json files containing @mdr/lib-utils,
     normalizes any link:@mdr/lib-utils specs to github:wsh-auto/lib-utils
     per SKILL.md, removes Bun lockfiles to clear pinned commits, and runs
     bun install to fetch the latest version from GitHub. Runs in parallel
@@ -2204,7 +2201,7 @@ if ! $SKIP_LINKS; then
 fi
 
 if ! $JSON; then
-  echo "${CYAN}Scanning ~/mnt for @mdr/lib-utils dependents...${NC}"
+  echo "${CYAN}Scanning ~/mnt/{mdr,tt,wsh} for @mdr/lib-utils dependents...${NC}"
 fi
 
 # Find workspace root (parent with "workspaces" in package.json), or return original dir
@@ -2225,7 +2222,7 @@ find_workspace_root() {
 
 # Find all package.json with lib-utils
 mapfile -t PJSONS < <(
-  rg -l '@mdr/lib-utils' ~/mnt --glob '**/package.json' --glob '!**/node_modules/**' --no-ignore --no-messages
+  rg -l '@mdr/lib-utils' ~/mnt/mdr ~/mnt/tt ~/mnt/wsh --glob '**/package.json' --glob '!**/node_modules/**' --glob '!**/.git/**' --glob '!**/dist/**' --no-ignore --no-messages
 )
 
 # Normalize any `link:@mdr/lib-utils` specs to `github:wsh-auto/lib-utils` per SKILL.md.
@@ -2620,13 +2617,13 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (48.1k)
-## Documentation (8.3k)
+# lib-utils (47.9k)
+## Documentation (8k)
 - [@SKILL.md (5k)](https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
-- @anima/memory/DREAM.md (1.4k)
-- @anima/memory/PENDING.md (800)
+- @anima/memory/DREAM.md (1.5k)
+- @anima/memory/PENDING.md (400)
 
 ## Code (5.8k)
 - @scripts/_LIB-UTILS_update-dependents (3.5k)
