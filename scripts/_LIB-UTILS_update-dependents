@@ -1,9 +1,10 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-LIBLOG_ORIGINAL_ARGS=("$@")
 # Update all projects that depend on @mdr/lib-utils to latest version
 
-set -uo pipefail  # Removed -e to not exit on errors
+set -euo pipefail
+
+LIBLOG_ORIGINAL_ARGS=("$@")
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd -P)"
@@ -108,6 +109,7 @@ LIBLOG_PROJECT="mdr:lib-utils:update-dependents"
 _liblog="$HOME/mnt/mdr/skills/lib-log/src/bash/liblog"
 LIBLOG_SOURCED=false
 [[ -r $_liblog ]] && { source "$_liblog"; liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"; LIBLOG_SOURCED=true; } || true
+$LIBLOG_SOURCED && liblog_crit_guard
 
 # Emit an after-return structured log row for an external subprocess (bun link /
 # bun install). Method/path/outcome/elapsedMs go inline in the message AND in the
@@ -166,12 +168,17 @@ bootstrap_links() {
     return
   fi
 
-  # Build pkg_name -> source_dir map from all non-vendored package.json
-  declare -A PKG_TO_DIR
-  local pjson name
+  # Build pkg_name -> source_dir map from all non-vendored package.json.
+  local pkg_names=()
+  local pkg_dirs=()
+  local pjson name dir
   while IFS= read -r pjson; do
-    name=$(jq -r '.name // empty' "$pjson" 2>/dev/null)
-    [[ -n "$name" ]] && PKG_TO_DIR[$name]=$(dirname "$pjson")
+    name=$(jq -r '.name // empty' "$pjson" 2>/dev/null || true)
+    if [[ -n "$name" ]]; then
+      dir=$(dirname "$pjson")
+      pkg_names+=("$name")
+      pkg_dirs+=("$dir")
+    fi
   done < <(rg --no-ignore --files \
     --glob '**/package.json' \
     --glob '!**/node_modules/**' \
@@ -180,12 +187,13 @@ bootstrap_links() {
     "${roots[@]}" 2>/dev/null)
 
   # Find all unique link:@scope/name references
-  mapfile -t LINK_PKGS < <(
-    rg --no-ignore --no-filename -o -e '"link:(@[^"]+)"' -r '$1' \
+  LINK_PKGS=()
+  while IFS= read -r pkg; do
+    LINK_PKGS+=("$pkg")
+  done < <(rg --no-ignore --no-filename -o -e '"link:(@[^"]+)"' -r '$1' \
       --glob '**/package.json' \
       --glob '!**/node_modules/**' \
-      "${roots[@]}" 2>/dev/null | sort -u
-  )
+      "${roots[@]}" 2>/dev/null | sort -u)
 
   if [[ ${#LINK_PKGS[@]} -eq 0 ]]; then
     echo "  ${DIM}No link: deps found${NC}"
@@ -194,7 +202,14 @@ bootstrap_links() {
 
   local registered=0 failed=0 missing=0
   for pkg in "${LINK_PKGS[@]}"; do
-    local src="${PKG_TO_DIR[$pkg]:-}"
+    local src=""
+    local i
+    for ((i = 0; i < ${#pkg_names[@]}; i++)); do
+      if [[ "${pkg_names[$i]}" == "$pkg" ]]; then
+        src="${pkg_dirs[$i]}"
+        break
+      fi
+    done
     if [[ -z "$src" ]]; then
       printf "  ${YELLOW}?${NC} %s ${DIM}source not found${NC}\n" "$pkg"
       ((missing++)) || true
@@ -231,7 +246,7 @@ if ! $SKIP_LINKS; then
     if $JSON; then
       jq -cn --argjson ok "$LINK_BOOTSTRAP_OK" '{linksOnly:true,ok:$ok}'
     fi
-    $LINK_BOOTSTRAP_OK && exit 0 || exit 1
+    $LINK_BOOTSTRAP_OK && exit 0 || exit 5
   fi
 fi
 
@@ -256,9 +271,10 @@ find_workspace_root() {
 }
 
 # Find all package.json with lib-utils
-mapfile -t PJSONS < <(
-  rg -l '@mdr/lib-utils' ~/mnt/mdr ~/mnt/tt ~/mnt/wsh --glob '**/package.json' --glob '!**/node_modules/**' --glob '!**/.git/**' --glob '!**/dist/**' --no-ignore --no-messages
-)
+PJSONS=()
+while IFS= read -r pjson; do
+  PJSONS+=("$pjson")
+done < <(rg -l '@mdr/lib-utils' ~/mnt/mdr ~/mnt/tt ~/mnt/wsh --glob '**/package.json' --glob '!**/node_modules/**' --glob '!**/.git/**' --glob '!**/dist/**' --no-ignore --no-messages)
 
 # Normalize any `link:@mdr/lib-utils` specs to `github:wsh-auto/lib-utils` per SKILL.md.
 # Skip lib-utils' own package.json (self-link is intentional in its monorepo).
@@ -281,12 +297,13 @@ if ! $DRY_RUN; then
 fi
 
 # Resolve to workspace roots, deduplicate
-mapfile -t DEPENDENTS < <(
-  printf '%s\n' "${PJSONS[@]}" | \
+DEPENDENTS=()
+while IFS= read -r dir; do
+  DEPENDENTS+=("$dir")
+done < <(printf '%s\n' "${PJSONS[@]}" | \
   xargs -I{} dirname {} | \
   while read -r dir; do find_workspace_root "$dir"; done | \
-  sort -u
-)
+  sort -u)
 
 if [[ ${#DEPENDENTS[@]} -eq 0 ]]; then
   if $JSON; then
@@ -327,10 +344,8 @@ RESULT_FILE=$(mktemp)
 echo 0 > "$FAIL_FILE"
 trap 'rm -f "$FAIL_FILE" "$RESULT_FILE"' EXIT
 
-# Millisecond epoch via the bash 5 EPOCHREALTIME builtin (no `date` fork).
-# EPOCHREALTIME is `seconds.microseconds`; the `[.,]` strip handles either
-# locale decimal separator, yielding an integer microsecond count -> /1000 = ms.
-now_ms() { local r=${EPOCHREALTIME/[.,]/}; echo $(( r / 1000 )); }
+# Whole-second elapsed timer. Bash 3.2 has no fork-free subsecond clock.
+now_ms() { echo $((SECONDS * 1000)); }
 
 update_project() {
   local dir=$1
@@ -363,7 +378,7 @@ update_project() {
 
   if [[ $exit_code -eq 0 ]]; then
     local version
-    version=$(echo "$output" | grep -o '@mdr/lib-utils@github:wsh-auto/lib-utils#[a-f0-9]*' | head -1 | sed 's/.*#//' | cut -c1-7)
+    version=$(echo "$output" | grep -o '@mdr/lib-utils@github:wsh-auto/lib-utils#[a-f0-9]*' | head -1 | sed 's/.*#//' | cut -c1-7 || true)
     _liblog_after_return info "install bun run with-lock:install ${short_path}: ok (${elapsed_ms}ms)" \
       method "bun-install" command "bun run with-lock:install" path "$dir" outcome "ok" elapsedMs "$elapsed_ms" version "${version:-ok}"
     if $JSON; then
@@ -374,7 +389,7 @@ update_project() {
     return 0
   else
     local err_msg
-    err_msg=$(echo "$output" | grep -i -E 'error|fail' | head -1 | cut -c1-50)
+    err_msg=$(echo "$output" | grep -i -E 'error|fail' | head -1 | cut -c1-50 || true)
     _liblog_after_return error "install bun run with-lock:install ${short_path}: failed (${elapsed_ms}ms)" \
       method "bun-install" command "bun run with-lock:install" path "$dir" outcome "failed" elapsedMs "$elapsed_ms" status "$exit_code" error "${err_msg:-failed}"
     if $JSON; then
@@ -417,4 +432,4 @@ else
   echo
   echo "${CYAN}Done:${NC} ${GREEN}${SUCCESS} updated${NC}$( [[ $FAIL -gt 0 ]] && echo ", ${RED}${FAIL} failed${NC}" )"
 fi
-exit $([[ $FAIL -gt 0 ]] && echo 1 || echo 0)
+exit $([[ $FAIL -gt 0 ]] && echo 5 || echo 0)
