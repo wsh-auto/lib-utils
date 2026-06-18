@@ -74,7 +74,7 @@ description: >-
   This skill should be used when working with TypeScript and Bun projects. Projects normally use Bun to run TypeScript directly, except Node-runtime consumers require compiled `dist/.js` exports. Keywords: "TypeScript", "TS", "Bun" Scripts: "install-on-missing-deps", "with-lock"
 requiredSkills:
   - mdr:lib-utils
-hackmd: https://hackmd.io/6wuVIJ5cQC21FaGpB-irYg
+hackmd: https://hackmd.io/b6Gk5_TVRU2ggO4RHgVUSQ
 ---
 
 # TypeScript Development Best Practices
@@ -435,6 +435,8 @@ Every TypeScript port that ships a `scripts/X` bash wrapper MUST include at leas
 
 Use `execFileSync('<scriptname>', ['--help'])` or another non-destructive flag, then match output with a regex or `expect(...).toContain(...)`. The smoke test must be reachable through the associated `$dev-test`-registered `package.json` test script. This catches failures that `src/lib` unit tests miss: missing `bun install`, broken `install-on-missing-deps`, Bun shebang resolution, and module-load errors.
 
+After the one required shipped-wrapper smoke, CLI behavior tests MUST NOT spawn `scripts/X` again. Prefer in-process dispatch or library tests (`_main`, `runCli`, parser helpers) for parser, help-text, and command logic. Spawn the direct entrypoint (`bun src/cli/X.ts`) only for process-level contracts such as exit-code tiers, stderr stack-trace cleanliness, stdout, and color. Reserve repeated shipped-wrapper spawns for explicit `test:e2e` shipped-binary suites.
+
 Prefer non-destructive getter calls such as `X --help`, `X list`, or `X status` over setters. Wrapper smoke tests run repeatedly, so a mutating smoke test is a footgun.
 
 `````typescript!
@@ -600,7 +602,9 @@ Skills use a three-level loading system to manage context efficiently:
 Always-loaded summaries must stay self-sufficient for routine use: include the trigger, scope, and one-line operational contract; reserve deep rationale and examples for the referenced skill.
 
 ### Skill Boundary == cwd Boundary == Agent Auto-Loaded Context; Split on Context Axis, Not Package Axis
-Agents are spawned via `tt spawn --cwd <skill-dir>`, and the cwd's `CLAUDE.md` frontmatter is the only signal that selects auto-loaded context. There is no way to spawn an agent "to work on subsystem Y of skill X" — cwd picks exactly one `CLAUDE.md`. Therefore **skill boundary == cwd boundary == agent auto-loaded-context boundary**, and skill bloat is a real cost: every agent spawned at that cwd loads it all.
+Agents are spawned via `tt spawn --cwd <skill-dir>`, and the cwd's `CLAUDE.md` frontmatter is the only signal that selects auto-loaded context.
+- There is no way to spawn an agent "to work on subsystem Y of skill X" — cwd picks exactly one `CLAUDE.md`.
+- Therefore **skill boundary == cwd boundary == agent auto-loaded-context boundary**
 
 This boundary is **orthogonal to npm package boundary**. One npm package can cleanly split into multiple sibling skill dirs (each with its own `SKILL.md` + `CLAUDE.md` + `references/`) so agents working on different subsystems get narrower context. Conversely, a separate npm package does not by itself warrant a separate skill.
 
@@ -2631,7 +2635,7 @@ requiredFiles:
 - @src/logger.ts (1.5k)
 
 ## requiredSkills (34k)
-- [@../dev-typescript/SKILL.md (8k)](https://hackmd.io/6wuVIJ5cQC21FaGpB-irYg)
+- [@../dev-typescript/SKILL.md (8k)](https://hackmd.io/b6Gk5_TVRU2ggO4RHgVUSQ)
   - [@SKILL.md (5k)](https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g)
 - [@../lib-1password/SKILL.md (3k)](https://hackmd.io/p4SYLbb2Q46I-ajQH8jeyg)
 - [@../lib-log/SKILL.md (11k)](https://hackmd.io/Qm0CJ-nOQ-Cwv03EJoL1Kg)

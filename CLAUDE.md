@@ -24,7 +24,7 @@ requiredFiles:
 - @src/logger.ts (1.5k)
 
 ## requiredSkills (34k)
-- [@../dev-typescript/SKILL.md (8k)](https://hackmd.io/6wuVIJ5cQC21FaGpB-irYg)
+- [@../dev-typescript/SKILL.md (8k)](https://hackmd.io/b6Gk5_TVRU2ggO4RHgVUSQ)
   - [@SKILL.md (5k)](https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g)
 - [@../lib-1password/SKILL.md (3k)](https://hackmd.io/p4SYLbb2Q46I-ajQH8jeyg)
 - [@../lib-log/SKILL.md (11k)](https://hackmd.io/Qm0CJ-nOQ-Cwv03EJoL1Kg)
