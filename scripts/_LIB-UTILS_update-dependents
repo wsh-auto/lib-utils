@@ -327,6 +327,11 @@ RESULT_FILE=$(mktemp)
 echo 0 > "$FAIL_FILE"
 trap 'rm -f "$FAIL_FILE" "$RESULT_FILE"' EXIT
 
+# Millisecond epoch via the bash 5 EPOCHREALTIME builtin (no `date` fork).
+# EPOCHREALTIME is `seconds.microseconds`; the `[.,]` strip handles either
+# locale decimal separator, yielding an integer microsecond count -> /1000 = ms.
+now_ms() { local r=${EPOCHREALTIME/[.,]/}; echo $(( r / 1000 )); }
+
 update_project() {
   local dir=$1
   local short_path="${dir/#$HOME/\~}"
@@ -351,9 +356,9 @@ update_project() {
   fi
 
   local output exit_code start_ms end_ms elapsed_ms
-  start_ms=$(($(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))))
+  start_ms=$(now_ms)
   output=$(bun run with-lock:install 2>&1) && exit_code=0 || exit_code=$?
-  end_ms=$(($(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))))
+  end_ms=$(now_ms)
   elapsed_ms=$((end_ms - start_ms))
 
   if [[ $exit_code -eq 0 ]]; then
@@ -381,7 +386,7 @@ update_project() {
   fi
 }
 
-export -f update_project _liblog_after_return
+export -f update_project _liblog_after_return now_ms
 export HOME CLEAN JSON RESULT_FILE LIBLOG_SOURCED
 
 FAIL=0
