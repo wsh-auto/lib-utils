@@ -13,7 +13,7 @@ PRIMARY: SKILL.md (5k) - How to use; self-contained
 - @CONTRIBUTING.md (600) - How to develop/maintain
 - @package.json (500) - Dependencies, scripts, project metadata
 - @anima/memory/DREAM.md (1.5k) - Aggregated agent memory ($anima-memory)
-- @anima/memory/PENDING.md (400) - Uncurated diary entries since last dream curation ($anima-memory)
+- @anima/memory/PENDING.md (600) - Uncurated diary entries since last dream curation ($anima-memory)
 
 All other files below are supporting context from dependencies.
 
@@ -1015,7 +1015,7 @@ export LITELLM_MASTER_KEY=op://wsh/skills_models-litellm/LITELLM_MASTER_KEY
 Wrapper loads .env and execs Python script:
 
 `````bash!
-#!/usr/bin/env bash
+#!/bin/bash
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 if [ ! -f "$ROOT_DIR/.env" ]; then
@@ -1075,7 +1075,7 @@ See CONTRIBUTING.md for the full migration plan.
 File: lib-log/README.md
 ================
 ---
-hackmd: https://hackmd.io/OoPQgCMKTxmIpjtp6apIHA
+hackmd: https://hackmd.io/98bb5aKLTJaVKrvs9IpMlg
 ---
 
 # @mdr/lib-log
@@ -1133,7 +1133,13 @@ Browser consumers import through `@mdr/lib-utils/browser`. With no token configu
 Browser rows use `hostname: browser`, `caller: human`, `binary: null`, and include page `origin` / `href` in context. Use only the least-privilege `AXIOM_TOKEN_FRONTEND` ingest token in browser code; never expose ingest-master, query, or test tokens. Direct Axiom unload flush uses `fetch(..., { keepalive: true })` because `sendBeacon` cannot attach the required bearer header; `axiom.beaconUrl` is for a same-origin auth proxy.
 
 ## Bash Helper
-Standalone bash CLIs snapshot `LIBLOG_ORIGINAL_ARGS=("$@")` before parsing, then source `src/bash/liblog` and call `liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"` after `--help`/`--version` exits. It emits `cli boot` immediately and installs an EXIT trap that emits `cli exit` with `wallMs` and `exitCode`; sourceable wrappers call `liblog_emit <level> <message> [argv...]` for detached non-lifecycle events. Delivery writes to the durable local spool consumed by `logshipd`; bash no longer needs `AXIOM_TOKEN`. Bash wrappers that immediately `exec` into TypeScript/Python inherit coverage from the wrapped entrypoint.
+Standalone bash CLIs snapshot `LIBLOG_ORIGINAL_ARGS=("$@")` before parsing, then source `src/bash/liblog` and call `liblog_cli_invoked` through an argc branch after `--help`/`--version` exits.
+- It emits `cli boot` immediately and installs an EXIT trap that emits `cli exit` with `wallMs` and `exitCode`.
+- The argc branch is required for no-argument CLIs on macOS bash 3.2 with `set -u`.
+- Sourceable wrappers call `liblog_emit <level> <message> [argv...]` for detached non-lifecycle events.
+- Delivery writes to the durable local spool consumed by `logshipd`; bash no longer needs `AXIOM_TOKEN`.
+- Bash wrappers that immediately `exec` into TypeScript/Python inherit coverage from the wrapped entrypoint.
+- See `$dev-bash` for bash entrypoint, strict-shell, and `liblog_crit_guard` placement rules.
 
 ## Delivery
 TypeScript, Python, and bash write canonical 10-column JSONL rows under `~/.local/state/lib-log/delivery/<YYYY-MM-DD>/`; `$mdr:srv-vector` owns the `logshipd` pmm service that runs Vector, ships those rows to Axiom, writes health, and performs checkpoint-aware reaping. lib-log owns row format, oversize compaction, flush/fsync, and `getSpoolBackpressureStatus()`.
@@ -1230,7 +1236,7 @@ description: >-
   This skill should be used when adding centralized cloud logging to TypeScript and Python projects using Axiom or querying logs with the ax CLI. Provides dual output: colored console + JSON to Axiom. Keywords: "Axiom", "createLogger" Scripts: "ax"
 requiredFiles:
   - README.md
-hackmd: https://hackmd.io/Qm0CJ-nOQ-Cwv03EJoL1Kg
+hackmd: https://hackmd.io/NW6P7MmBT96KIwz_njPGNg
 ---
 
 # lib-log
@@ -1830,10 +1836,20 @@ For spawned child CLIs, set `LIBLOG_CALLER=automation` in the child environment;
 `````bash!
 LIBLOG_ORIGINAL_ARGS=("$@")
 _liblog="$HOME/mnt/mdr/skills/lib-log/src/bash/liblog"
-[[ -r $_liblog ]] && { source "$_liblog"; liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"; } || true
+if [[ -r $_liblog ]]; then
+  source "$_liblog"
+  if ((${#LIBLOG_ORIGINAL_ARGS[@]})); then liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"
+  else liblog_cli_invoked
+  fi
+fi
 `````
 
-Standalone bash CLIs snapshot `LIBLOG_ORIGINAL_ARGS=("$@")` before argument parsing, then place the source/call preamble after `--help`/`--version` early exits and after strict-mode setup. `liblog_cli_invoked` emits `cli boot` and installs an EXIT trap that emits `cli exit` with `wallMs` and `exitCode`. `src/bash/liblog` is fail-soft and uses the same durable spool as TypeScript/Python via detached `printf >>` O_APPEND writes with a PIPE_BUF-sized 4096B row cap; `LIBLOG_SPOOL_ROOT` can override the spool root for tests, and Axiom visibility normally lags by 1-10s while `logshipd` ships the row.
+Standalone bash CLIs snapshot `LIBLOG_ORIGINAL_ARGS=("$@")` before argument parsing, then place the source/call preamble after `--help`/`--version` early exits and after strict-mode setup.
+- Keep the argc branch above so no-argument CLIs stay compatible with macOS bash 3.2 under `set -u`.
+- `liblog_cli_invoked` emits `cli boot` and installs an EXIT trap that emits `cli exit` with `wallMs` and `exitCode`.
+- `src/bash/liblog` is fail-soft and uses the same durable spool as TypeScript/Python via detached `printf >>` O_APPEND writes with a PIPE_BUF-sized 4096B row cap.
+- `LIBLOG_SPOOL_ROOT` can override the spool root for tests, and Axiom visibility normally lags by 1-10s while `logshipd` ships the row.
+- See `$dev-bash` for bash entrypoint, strict-shell, and `liblog_crit_guard` placement rules.
 
 Sourceable bash wrappers may call `liblog_emit <level> <message> [argv...]` for non-lifecycle events. It is a fail-soft detached spool emitter; use standard levels `debug`, `info`, `warn`, `error`, and `critical`.
 
@@ -1950,29 +1966,35 @@ File: lib-utils/anima/memory/PENDING.md
 # Memory
 
 ## TABLE OF CONTENTS
-- 2026-06-16
-  - [13:28] FIX- rescope update-dependents discovery scan to satisfy scan-guard
+- 2026-06-18
+  - [13:57] FIX- Replace broken date %N timing with bash-5 EPOCHREALTIME in _LIB-UTILS_update-dependents
 
-## 2026-06-16
-### [13:28] FIX- rescope update-dependents discovery scan to satisfy scan-guard
-`ccsync --full` was dying with exit 4 in panes where the cli-bash scan-guard wrapper (`~/mnt/.bin/rg`) is PATH-first. Root cause: `_LIB-UTILS_update-dependents:260` discovered dependents with `rg -l '@mdr/lib-utils' ~/mnt --no-ignore` (bare-root + only node_modules excluded), which the guard refuses (`bare-root`). Fix: scope to `~/mnt/mdr ~/mnt/tt ~/mnt/wsh` + add `!**/.git/**` `!**/dist/**` globs — matching the same three roots the script's link-bootstrap (line 163) already uses.
+## 2026-06-18
+### [13:57] FIX- Replace broken date %N timing with bash-5 EPOCHREALTIME in _LIB-UTILS_update-dependents
+Symptom: `ccsync --full` spewed `line 354: 17817561573N: value too great for base (error token is "17817561573N")` ~111x (once per dependent).
 
-Validation caught the load-bearing risk: would scoping to three roots drop any dependent? Proven NO — full bare-`~/mnt` scan and 3-root scan both return 111 pkgs, `comm` diff empty. Every `@mdr/lib-utils` consumer lives under mdr/tt/wsh. Also tightened the `--help`/echo "Scans ~/mnt" prose to "Scans ~/mnt/{mdr,tt,wsh}" for precision.
+RCA: macOS BSD `date` doesn't support `%N`. `date +%s%3N` expands `%s` to epoch seconds then prints the literal chars `3N` -> `<epoch>3N`. Crucially it EXITS 0, so the `2>/dev/null || echo <fallback>` guard never fired (guard relied on exit status, which BSD date honors fine — it just emits wrong text). The garbage `<epoch>3N` then hit `$(( ... ))` -> bash "value too great for base". Exactly the DREAM.md lesson "detect BSD vs GNU by binary behavior, not exit status." Only reproduced on a BSD-date path; on mbp the agent's homebrew gdate masked it inconsistently.
 
-The bug only reproduces where the guard wrapper wins on PATH; on mbp the agent Bash tool resolves `rg` to `/opt/homebrew/bin/rg` (homebrew), which bypasses the guard — so the same command "worked" in one pane and exit-4'd in another. That PATH-bypass is a separate, larger workstream (close-the-bypass) owned by other panes.
+Fix: added `now_ms()` using bash-5 `EPOCHREALTIME` builtin (`${EPOCHREALTIME/[.,]/}` strips locale decimal sep -> integer us -> /1000 = ms), zero fork. Replaced both date calls; added `now_ms` to `export -f` for the parallel `&` subshells.
 
-Verdict: confirmed
-Durable lesson: Any fleet-wide `rg`/`fd` over ~/mnt must use scoped roots (`~/mnt/{mdr,tt,wsh}`) + node_modules/.git/dist excludes, or it breaks under the scan-guard wrapper wherever ~/mnt/.bin wins on PATH. A scan that passes via homebrew rg is not proof it passes the guard.
+Rejected: `bun -e Date.now()` (forks Bun 111x — user flagged as heavy shell-out, correct); `gdate` (still per-call subprocess, not on every host).
+
+Policy thread: CTO asked bash 3.2.57 vs 5.x. dev-bash hawk %1191 first said "NEVER 3.2" then CORRECTED: we DO target 3.2.57 — but ONLY for SOURCEABLE hot-path libs (a sourced lib runs under its caller's shebang; a /bin/bash caller pins it to 3.2; enforced by dev-typescript/src/bash/deps-stale.sh + install-on-missing-deps.test.sh sourcing under /bin/bash). Standalone scripts owning `#!/usr/bin/env bash` use bash 5 freely. _LIB-UTILS_update-dependents is standalone AND already bash-5-only (declare -A, mapfile), so EPOCHREALTIME is safe.
+
+Durable lesson: A subagent that scopes a `git log -S` pickaxe to one skill dir can return a confidently-wrong "NEVER" — the real contract lived in dev-typescript history. Adversarial follow-up ("are you sure? full history?") flipped it. Also: dev-bash SKILL.md doesn't document the sourced-lib 3.2-compat rule (lives only in a test + diary); hawk %1191 drafting the addition.
+
+Verdict: confirmed (fix); pending (doc addition + lite-validate subagent).
 
 ================
 File: lib-utils/scripts/_LIB-UTILS_update-dependents
 ================
-#!/usr/bin/env bash
+#!/bin/bash
 
-LIBLOG_ORIGINAL_ARGS=("$@")
 # Update all projects that depend on @mdr/lib-utils to latest version
 
-set -uo pipefail  # Removed -e to not exit on errors
+set -euo pipefail
+
+LIBLOG_ORIGINAL_ARGS=("$@")
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd -P)"
@@ -2076,7 +2098,14 @@ fi
 LIBLOG_PROJECT="mdr:lib-utils:update-dependents"
 _liblog="$HOME/mnt/mdr/skills/lib-log/src/bash/liblog"
 LIBLOG_SOURCED=false
-[[ -r $_liblog ]] && { source "$_liblog"; liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"; LIBLOG_SOURCED=true; } || true
+if [[ -r $_liblog ]]; then
+  source "$_liblog"
+  if ((${#LIBLOG_ORIGINAL_ARGS[@]})); then liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"
+  else liblog_cli_invoked
+  fi
+  LIBLOG_SOURCED=true
+fi
+$LIBLOG_SOURCED && liblog_crit_guard
 
 # Emit an after-return structured log row for an external subprocess (bun link /
 # bun install). Method/path/outcome/elapsedMs go inline in the message AND in the
@@ -2135,12 +2164,17 @@ bootstrap_links() {
     return
   fi
 
-  # Build pkg_name -> source_dir map from all non-vendored package.json
-  declare -A PKG_TO_DIR
-  local pjson name
+  # Build pkg_name -> source_dir map from all non-vendored package.json.
+  local pkg_names=()
+  local pkg_dirs=()
+  local pjson name dir
   while IFS= read -r pjson; do
-    name=$(jq -r '.name // empty' "$pjson" 2>/dev/null)
-    [[ -n "$name" ]] && PKG_TO_DIR[$name]=$(dirname "$pjson")
+    name=$(jq -r '.name // empty' "$pjson" 2>/dev/null || true)
+    if [[ -n "$name" ]]; then
+      dir=$(dirname "$pjson")
+      pkg_names+=("$name")
+      pkg_dirs+=("$dir")
+    fi
   done < <(rg --no-ignore --files \
     --glob '**/package.json' \
     --glob '!**/node_modules/**' \
@@ -2149,12 +2183,13 @@ bootstrap_links() {
     "${roots[@]}" 2>/dev/null)
 
   # Find all unique link:@scope/name references
-  mapfile -t LINK_PKGS < <(
-    rg --no-ignore --no-filename -o -e '"link:(@[^"]+)"' -r '$1' \
+  LINK_PKGS=()
+  while IFS= read -r pkg; do
+    LINK_PKGS+=("$pkg")
+  done < <(rg --no-ignore --no-filename -o -e '"link:(@[^"]+)"' -r '$1' \
       --glob '**/package.json' \
       --glob '!**/node_modules/**' \
-      "${roots[@]}" 2>/dev/null | sort -u
-  )
+      "${roots[@]}" 2>/dev/null | sort -u)
 
   if [[ ${#LINK_PKGS[@]} -eq 0 ]]; then
     echo "  ${DIM}No link: deps found${NC}"
@@ -2163,7 +2198,14 @@ bootstrap_links() {
 
   local registered=0 failed=0 missing=0
   for pkg in "${LINK_PKGS[@]}"; do
-    local src="${PKG_TO_DIR[$pkg]:-}"
+    local src=""
+    local i
+    for ((i = 0; i < ${#pkg_names[@]}; i++)); do
+      if [[ "${pkg_names[$i]}" == "$pkg" ]]; then
+        src="${pkg_dirs[$i]}"
+        break
+      fi
+    done
     if [[ -z "$src" ]]; then
       printf "  ${YELLOW}?${NC} %s ${DIM}source not found${NC}\n" "$pkg"
       ((missing++)) || true
@@ -2200,7 +2242,7 @@ if ! $SKIP_LINKS; then
     if $JSON; then
       jq -cn --argjson ok "$LINK_BOOTSTRAP_OK" '{linksOnly:true,ok:$ok}'
     fi
-    $LINK_BOOTSTRAP_OK && exit 0 || exit 1
+    $LINK_BOOTSTRAP_OK && exit 0 || exit 5
   fi
 fi
 
@@ -2225,9 +2267,10 @@ find_workspace_root() {
 }
 
 # Find all package.json with lib-utils
-mapfile -t PJSONS < <(
-  rg -l '@mdr/lib-utils' ~/mnt/mdr ~/mnt/tt ~/mnt/wsh --glob '**/package.json' --glob '!**/node_modules/**' --glob '!**/.git/**' --glob '!**/dist/**' --no-ignore --no-messages
-)
+PJSONS=()
+while IFS= read -r pjson; do
+  PJSONS+=("$pjson")
+done < <(rg -l '@mdr/lib-utils' ~/mnt/mdr ~/mnt/tt ~/mnt/wsh --glob '**/package.json' --glob '!**/node_modules/**' --glob '!**/.git/**' --glob '!**/dist/**' --no-ignore --no-messages)
 
 # Normalize any `link:@mdr/lib-utils` specs to `github:wsh-auto/lib-utils` per SKILL.md.
 # Skip lib-utils' own package.json (self-link is intentional in its monorepo).
@@ -2250,12 +2293,13 @@ if ! $DRY_RUN; then
 fi
 
 # Resolve to workspace roots, deduplicate
-mapfile -t DEPENDENTS < <(
-  printf '%s\n' "${PJSONS[@]}" | \
+DEPENDENTS=()
+while IFS= read -r dir; do
+  DEPENDENTS+=("$dir")
+done < <(printf '%s\n' "${PJSONS[@]}" | \
   xargs -I{} dirname {} | \
   while read -r dir; do find_workspace_root "$dir"; done | \
-  sort -u
-)
+  sort -u)
 
 if [[ ${#DEPENDENTS[@]} -eq 0 ]]; then
   if $JSON; then
@@ -2296,6 +2340,9 @@ RESULT_FILE=$(mktemp)
 echo 0 > "$FAIL_FILE"
 trap 'rm -f "$FAIL_FILE" "$RESULT_FILE"' EXIT
 
+# Whole-second elapsed timer. Bash 3.2 has no fork-free subsecond clock.
+now_ms() { echo $((SECONDS * 1000)); }
+
 update_project() {
   local dir=$1
   local short_path="${dir/#$HOME/\~}"
@@ -2320,14 +2367,14 @@ update_project() {
   fi
 
   local output exit_code start_ms end_ms elapsed_ms
-  start_ms=$(($(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))))
+  start_ms=$(now_ms)
   output=$(bun run with-lock:install 2>&1) && exit_code=0 || exit_code=$?
-  end_ms=$(($(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))))
+  end_ms=$(now_ms)
   elapsed_ms=$((end_ms - start_ms))
 
   if [[ $exit_code -eq 0 ]]; then
     local version
-    version=$(echo "$output" | grep -o '@mdr/lib-utils@github:wsh-auto/lib-utils#[a-f0-9]*' | head -1 | sed 's/.*#//' | cut -c1-7)
+    version=$(echo "$output" | grep -o '@mdr/lib-utils@github:wsh-auto/lib-utils#[a-f0-9]*' | head -1 | sed 's/.*#//' | cut -c1-7 || true)
     _liblog_after_return info "install bun run with-lock:install ${short_path}: ok (${elapsed_ms}ms)" \
       method "bun-install" command "bun run with-lock:install" path "$dir" outcome "ok" elapsedMs "$elapsed_ms" version "${version:-ok}"
     if $JSON; then
@@ -2338,7 +2385,7 @@ update_project() {
     return 0
   else
     local err_msg
-    err_msg=$(echo "$output" | grep -i -E 'error|fail' | head -1 | cut -c1-50)
+    err_msg=$(echo "$output" | grep -i -E 'error|fail' | head -1 | cut -c1-50 || true)
     _liblog_after_return error "install bun run with-lock:install ${short_path}: failed (${elapsed_ms}ms)" \
       method "bun-install" command "bun run with-lock:install" path "$dir" outcome "failed" elapsedMs "$elapsed_ms" status "$exit_code" error "${err_msg:-failed}"
     if $JSON; then
@@ -2350,7 +2397,7 @@ update_project() {
   fi
 }
 
-export -f update_project _liblog_after_return
+export -f update_project _liblog_after_return now_ms
 export HOME CLEAN JSON RESULT_FILE LIBLOG_SOURCED
 
 FAIL=0
@@ -2381,7 +2428,7 @@ else
   echo
   echo "${CYAN}Done:${NC} ${GREEN}${SUCCESS} updated${NC}$( [[ $FAIL -gt 0 ]] && echo ", ${RED}${FAIL} failed${NC}" )"
 fi
-exit $([[ $FAIL -gt 0 ]] && echo 1 || echo 0)
+exit $([[ $FAIL -gt 0 ]] && echo 5 || echo 0)
 
 ================
 File: lib-utils/src/env.ts
@@ -2621,16 +2668,16 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (47.9k)
-## Documentation (8k)
+# lib-utils (48.2k)
+## Documentation (8.2k)
 - [@SKILL.md (5k)](https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
 - @anima/memory/DREAM.md (1.5k)
-- @anima/memory/PENDING.md (400)
+- @anima/memory/PENDING.md (600)
 
-## Code (5.8k)
-- @scripts/_LIB-UTILS_update-dependents (3.5k)
+## Code (6k)
+- @scripts/_LIB-UTILS_update-dependents (3.6k)
 - @src/env.ts (800)
 - @src/logger.ts (1.5k)
 
@@ -2638,8 +2685,8 @@ requiredFiles:
 - [@../dev-typescript/SKILL.md (8k)](https://hackmd.io/b6Gk5_TVRU2ggO4RHgVUSQ)
   - [@SKILL.md (5k)](https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g)
 - [@../lib-1password/SKILL.md (3k)](https://hackmd.io/p4SYLbb2Q46I-ajQH8jeyg)
-- [@../lib-log/SKILL.md (11k)](https://hackmd.io/Qm0CJ-nOQ-Cwv03EJoL1Kg)
-  - [@../lib-log/README.md (2k)](https://hackmd.io/OoPQgCMKTxmIpjtp6apIHA)
+- [@../lib-log/SKILL.md (11k)](https://hackmd.io/NW6P7MmBT96KIwz_njPGNg)
+  - [@../lib-log/README.md (2k)](https://hackmd.io/98bb5aKLTJaVKrvs9IpMlg)
 - [@../edit-skill/SKILL.md (5k)](https://hackmd.io/KP6XTElkQXuNXale7a0AOQ)
 
 ================

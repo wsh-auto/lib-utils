@@ -108,7 +108,13 @@ fi
 LIBLOG_PROJECT="mdr:lib-utils:update-dependents"
 _liblog="$HOME/mnt/mdr/skills/lib-log/src/bash/liblog"
 LIBLOG_SOURCED=false
-[[ -r $_liblog ]] && { source "$_liblog"; liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"; LIBLOG_SOURCED=true; } || true
+if [[ -r $_liblog ]]; then
+  source "$_liblog"
+  if ((${#LIBLOG_ORIGINAL_ARGS[@]})); then liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"
+  else liblog_cli_invoked
+  fi
+  LIBLOG_SOURCED=true
+fi
 $LIBLOG_SOURCED && liblog_crit_guard
 
 # Emit an after-return structured log row for an external subprocess (bun link /
