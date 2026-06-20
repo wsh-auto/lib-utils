@@ -9,7 +9,7 @@
       },
       "devDependencies": {
         "@eslint/js": "8.57.0",
-        "@mdr/dev-typescript": "link:@mdr/dev-typescript",
+        "@mdr/lint-typescript": "link:@mdr/lint-typescript",
         "@types/node": "20.13.0",
         "dotenv": "17.2.3",
         "eslint": "8.57.0",
@@ -92,13 +92,13 @@
 
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
-    "@mdr/dev-typescript": ["@mdr/dev-typescript@link:@mdr/dev-typescript", {}],
-
     "@mdr/lib-1password": ["@mdr/lib-1password@link:@mdr/lib-1password", {}],
 
     "@mdr/lib-helpers": ["@mdr/lib-helpers@link:@mdr/lib-helpers", {}],
 
     "@mdr/lib-log": ["@mdr/lib-log@link:@mdr/lib-log", {}],
+
+    "@mdr/lint-typescript": ["@mdr/lint-typescript@link:@mdr/lint-typescript", {}],
 
     "@nodelib/fs.scandir": ["@nodelib/fs.scandir@2.1.5", "", { "dependencies": { "@nodelib/fs.stat": "2.0.5", "run-parallel": "^1.1.9" } }, "sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g=="],
 
@@ -410,7 +410,7 @@
 
     "run-parallel": ["run-parallel@1.2.0", "", { "dependencies": { "queue-microtask": "^1.2.2" } }, "sha512-5l4VyZR86LZ/lDxZTR6jqL8AFE2S0IFLMP26AbjsLVADxHdhB/c0GUsH+y39UfCi3dzz8OlQuPmnaJOMoDHQBA=="],
 
-    "semver": ["semver@7.8.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA=="],
+    "semver": ["semver@7.8.5", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA=="],
 
     "shebang-command": ["shebang-command@2.0.0", "", { "dependencies": { "shebang-regex": "^3.0.0" } }, "sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA=="],
 
