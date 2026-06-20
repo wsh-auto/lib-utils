@@ -1,0 +1,1 @@
+,{"_time":"2026-06-20T11:08:48.378Z","level":"debug","message":"cli exit","project":"mdr:lib-utils:update-dependents","env":"production","hostname":"mbp\n,","caller":",codex","binary":"_LIB-UTILS_update-dependents","context":"{\"wallMs\":37554,\"exitCode\":1}","error":null}
