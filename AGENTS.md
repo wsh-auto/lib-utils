@@ -37,8 +37,6 @@ Review process:
 ================================================================
 Directory Structure
 ================================================================
-dev-typescript/
-  SKILL.md
 edit-skill/
   SKILL.md
 lib-1password/
@@ -60,428 +58,12 @@ lib-utils/
   CONTRIBUTING.md
   package.json
   SKILL.md
+lint-typescript/
+  SKILL.md
 
 ================================================================
 Files
 ================================================================
-
-================
-File: dev-typescript/SKILL.md
-================
----
-name: dev-typescript
-description: >-
-  This skill should be used when working with TypeScript and Bun projects. Projects normally use Bun to run TypeScript directly, except Node-runtime consumers require compiled `dist/.js` exports. Keywords: "TypeScript", "TS", "Bun" Scripts: "install-on-missing-deps", "with-lock"
-requiredSkills:
-  - mdr:lib-utils
-hackmd: https://hackmd.io/b6Gk5_TVRU2ggO4RHgVUSQ
----
-
-# TypeScript Development Best Practices
-
-For project bootstrap, templates, install wrappers, Bun setup, package scripts, local dependencies, and NFS native dependency notes, read `references/project-setup.md`.
-
-Default runtime is Bun direct-from-`src/`. Exception: packages exporting symbols loaded by Node-runtime tools must ship compiled `dist/.js` exports; see `references/project-setup.md` "Exception: Library Packages with Node-Runtime Consumers".
-
-## TABLE OF CONTENTS
-- 1\. Code Conventions
-    - Class vs Type/Interface: Use Class for Methods/Serialization; Type for Data-Only
-    - Prefer String Literals Over Enums
-    - Trust TypeScript Types: Banned: Redundant Runtime Type Checks
-    - Narrow Types by Default; Banned: `[key: string]: unknown` Without a Named Consumer
-    - Internal Functions
-    - Export Policy: Name Public Exports Explicitly; Banned: `export *`
-    - JSDoc: Add `/** */` Above Every Function, Class, and Interface
-    - Interface Placement: Co-locate Types Above Their Primary Function
-    - Module Splitting
-    - Lint Errors: Fix, Don't Suppress
-    - Markdown Writes: Apply `fixMarkdown()` Before Writing; Banned: Raw `.md` Write Calls
-    - Banned: Bare `catch {}`; Catch Blocks Must Handle or Propagate
-    - Entry-Point Critical Guards: Wrap CLI `_main()` and Daemon Loops; Banned: Hand-Rolled Critical Catches
-    - Path Comparison: Use `realpathSync()`; Banned: `resolve()` for Deduplication
-    - Path Construction: Use `resolve()`; Banned: String Concatenation
-    - Config Loaders: No Env Overrides of `config.yml` by Default
-    - CLI Argument Parsing: Use `@mdr/lib-argv`; Banned: Manual Parsing
-    - CLI Table Output: TypeScript-Specific Patterns
-    - CLI Design Principles
-    - Code Style: Single-Line Preference
-    - Synchronous Sleep: Use `Atomics.wait`; Banned: `execSync('sleep')`, `Bun.sleepSync`
-    - `bun:sqlite` in Daemons: Yield Between Batches; Banned: Unbounded Sync Loops
-    - Timeouts: Use `execWithLog` for `execFileSync`; Log Before Throwing
-    - `tt` Watchers: Follow `$dev-core` and Use `@mdr/lib-watch`
-- 2\. Testing & Verification
-    - Test Organization (TypeScript-Specific)
-    - Global Setup for Vitest
-    - Exercising `bun:ffi`/`bun:sqlite` from Vitest Tests: Shell Out to `bun -e`; Banned: `bun --bun vitest` (2026-04)
-    - CLI Wrapper Smoke Test: Required for Every `scripts/X` Wrapper
-    - Child Processes in Tests MUST Pass `timeout`; Banned: Untimed `spawnSync`/`execSync`/`execFileSync`/`Bun.spawnSync`
-    - `critGuardCli` Structured-Exit Tests: Clean Up Process-Level State
-    - Local Rule Package Smoke Test: Use Real `eslint --config`
-    - Definition of Done: Work Is NOT Done Until `bun run test` Has Been Run
-    - Verification
-- 3\. Shell Conventions
-
-## 1. Code Conventions
-
-### Class vs Type/Interface: Use Class for Methods/Serialization; Type for Data-Only
-**Use class when the type needs methods (especially serialization).** Data-only types stay as type aliases or interfaces.
-
-`````typescript!
-// ✅ Data-only → type alias
-type Plan = Map<string, Section>
-
-// ✅ Wire entity with serialization → class
-class PlanFile {
-  constructor(public plan: Plan, public _mtime?: number, public _path?: string) {}
-  toJSON() { /* Socket.io auto-calls */ }
-  static fromJSON(obj: any): PlanFile { /* reconstruct from JSON */ }
-}
-`````
-
-**Discriminated unions over undefined:**
-
-`````typescript!
-// ❌ Avoid - undefined mixed with object types
-function process(): { data: T } | { error: string } | undefined
-
-// ✅ Prefer - explicit discriminated union with type field
-function process(): { type: 'success'; data: T } | { type: 'error'; error: string } | { type: 'noop' }
-`````
-
-Enables clean switch statements and makes "nothing to do" explicit rather than implicit.
-
-**Derive types instead of duplicating:**
-
-`````typescript!
-// ❌ Avoid - duplicates PlanFile.toJSON() return shape
-interface PlanFileData {
-  plan: Record<string, unknown>;
-  _mtime?: number;
-  _path?: string;
-}
-
-// ✅ Prefer - derive from existing type
-type PlanFileJson = ReturnType<PlanFile['toJSON']>;
-`````
-
-Use `ReturnType<>`, `Parameters<>`, `Awaited<>` to derive types from existing functions/methods. Keeps types in sync and reduces duplication.
-
-### Prefer String Literals Over Enums
-Prefer zero-runtime string literal unions over string-valued enums. Numeric mapping enums, such as HTTP status code maps, are the allowed exception. String enums are lint-checked by `local/prefer-string-literal-union` (warn).
-
-### Trust TypeScript Types: Banned: Redundant Runtime Type Checks
-Don't add runtime type checks (`Array.isArray`, `typeof`) when TypeScript types already guarantee the shape. Push filtering/transformation into library calls when possible. Use `ReturnType<>`, `Parameters<>` to derive types instead of duplicating. Use `Object.fromEntries()`, `.map()`, `.filter()` over imperative loops. Don't reimplement library features (e.g., socket.io has built-in reconnection).
-
-**Use objects directly** when they already match the required shape:
-
-`````typescript!
-// ❌ Avoid - unnecessary destructure/reconstruct
-socket.emit('planFile:data', { plan: planFile.plan, _mtime: planFile._mtime, _path: planFile._path });
-// ✅ Prefer - object already has the right shape
-socket.emit('planFile:data', planFile);
-`````
-
-**When reconstruction IS needed:** adding/removing fields, renaming fields, transforming values.
-
-### Narrow Types by Default; Banned: `[key: string]: unknown` Without a Named Consumer
-TS-specific manifestation of `$dev-core` "Don't design API surface 'just in case'".
-
-Use narrow object shapes by default. Wide index signatures like `[key: string]: unknown` and broad `Record<string, unknown>` types defeat TypeScript's ability to verify named fields, so reserve them for real dynamic-key surfaces.
-
-Only use a wide shape when a named consumer reads arbitrary keys today. If all current consumers read known properties, model those properties directly.
-
-### Internal Functions
-See `$mdr:dev-core` § "Internal Functions". Use `_` prefix for non-exported functions.
-
-### Export Policy: Name Public Exports Explicitly; Banned: `export *`
-See `$mdr:dev-core` § "Export Policy" for the canonical public-vs-internal definition. Minimize exports.
-
-**Banned: wildcard barrel re-exports (`export *`).** A package's barrel (`src/index.ts`) and each `package.json` `exports` subpath MUST name every public symbol explicitly (`export { foo, bar } from './x.js'`). `export *` auto-publishes every declaration-site `export`, which (a) erases the public/internal boundary — an `_`-helper exported for a test silently leaks into the package surface — and (b) forces `$edit-readme` to guess what's public. The explicit named barrel IS the package's public API: it's the list `$edit-readme` documents.
-
-`local/jsdoc-required` keys on **declaration-site** `export` of non-`_` names (not barrel membership) and skips `_`-prefixed/`private`/`protected` even when exported. So treat any non-`_` `export` as public: name it in the barrel, JSDoc it, document it. A cross-file helper you do NOT want public gets the `_` prefix — then it is lint- and README-exempt and may still be `export`ed for tests. The template ESLint rule `local/no-export-all` enforces the `export *` ban for packages using the shared `$dev-typescript` config.
-
-**Gotcha: removing a barrel export needs the package's real `bun run test`, not typecheck-only.** `tsc` resolves `.js` import specifiers without verifying the named export still exists, so a test (or any consumer) still importing a just-removed barrel symbol passes `tsc` but fails at runtime (`X is not a function`). When you remove or demote a barrel export, gate with the package's real `bun run test` (vitest), not focused `tsc` alone — and migrate any remaining intra-package/test importer to a relative source path (`../../src/x.js`).
-
-**Authored docs count as consumers before export demotion.** Before removing or demoting an exported symbol, search shipped docs and generated context manifests that teach or require that symbol, not only source imports. A symbol referenced from `SKILL.md`, `CONTRIBUTING.md`, examples, audit checklists, or required-file manifests is still a public contract until that prose is migrated or deleted in the same change.
-
-### JSDoc: Add `/** */` Above Every Function, Class, and Interface
-Every PUBLIC exported function, class, method, and interface MUST have a `/** */` comment. Internal helpers (`_`-prefix names, `private`/`protected` class members, non-exported functions) are exempt; the lint rule `local/jsdoc-required` enforces this scope. Scale detail to complexity: simple getters get a one-liner, complex methods get multi-line with context. Classes that own lifecycle or orchestration should document the full lifecycle (numbered steps from creation to teardown).
-
-Public export rule:
-- Public exported functions and methods MUST include `@param` tags for every parameter.
-- Public exported functions and methods MUST include an explicit `@returns` tag.
-- Internal helpers can keep lighter JSDoc when the signature is already obvious.
-
-Use `@example` for complex object parameters (WebSocket messages, API shapes).
-
-### Interface Placement: Co-locate Types Above Their Primary Function
-Place exported types/interfaces directly above the function that uses them (as return type or parameter), below the JSDoc:
-
-`````typescript!
-/**
- * Get session info from state directory
- * @returns Session info or undefined
- */
-export interface SessionInfo {
-  sessionId: string;
-  mtime: number;
-}
-export function getSessionInfo(paneId: string): SessionInfo | undefined {
-`````
-
-Co-locates the type with its primary usage. Applies to both return types and parameter types when that type is only used by one function.
-
-### Module Splitting
-Consider splitting modules when some exports have heavy dependencies and others don't. This lets consumers import only what they need without loading the entire dependency tree.
-
-`````typescript!
-// Before: barrel file forces all deps to load
-// lib/index.ts
-export * from './heavy-collection.js';  // imports runtime tooling, NFS, child_process
-export * from './light-reader.js';      // just fs.readFileSync
-
-// After: split so light consumers don't pay for heavy deps
-// lib/light-reader.ts - standalone, no heavy imports
-export function readCached() { /* just fs */ }
-
-// lib/heavy-collection.ts
-import { readCached } from './light-reader.js';  // re-use
-export { readCached };  // re-export for barrel compatibility
-export async function collectFresh() { /* heavy deps */ }
-`````
-
-**CLI fast-path optimization:** When a CLI has fast paths (cache reads) and slow paths (browser automation, heavy processing), use dynamic `import()` to avoid loading heavy deps on fast paths:
-
-`````typescript!
-// cli.ts - entry point, handles cache reads (no heavy deps)
-if (!live && hasCachedData()) {
-  return outputCached();  // Fast: no Playwright loaded
-}
-// Lazy-load only when needed
-const { getAccountUsage } = await import('./browser.js');  // browser.js imports Playwright
-`````
-
-Real example: `www-claude-usage` reduced cache-path startup from 0.6s → 0.15s by splitting browser automation into `browser.ts`.
-
-**Subpath splits: physical move; Banned: re-export from original.** When splitting a module into `package.json` `exports` subpaths, move function bodies to their new file. Re-exporting from the original defeats dependency isolation -- consumers still load the original module's full dependency tree.
-
-After adding or moving a package export subpath, verify at least one real installed consumer can resolve the exported path before restarting daemons or declaring done. Source-local typecheck is not enough when linked dependency snapshots or Node/Bun loaders see a different export surface.
-
-When a dependency or helper moves from sync/CommonJS to async ESM, sweep lazy loaders in the touched module for `require(` / `createRequire()` and convert them to `await import(...)` where the call path is already async. Typecheck alone can miss this because the failure appears at runtime after dependency semantics change.
-
-#### No Top-Level `await` in Library Barrels
-Library barrels (`src/lib/index.ts`, `src/index.ts`) MUST NOT contain `await` at module scope — top-level `await` creates a TDZ window during cold-start re-entry. Async setup belongs at the CLI/application entry point, not the barrel. The one allowed barrel-level call is a synchronous secret-owning `initEnv()` (see `$lib-1password` "Pattern B: TypeScript"). Grep: `rg -n '^await ' src/lib/index.ts src/index.ts`.
-
-### Lint Errors: Fix, Don't Suppress
-See `$mdr:dev-core` § "Lint Errors". Never use `// eslint-disable` or `@ts-ignore`.
-
-For `mdr/skills/*`, `eslint.config.js` should usually be a symlink to `dev-typescript/assets/templates/eslint.config.js`. A regular owned `eslint.config.js` means the package intentionally customizes lint rules or plugins.
-
-Local lint rules enforce the automatable TypeScript policy surface:
-
-| Rule | Source policy |
-|------|---------------|
-| `local/no-bare-catch` | "Banned: Bare `catch {}`" |
-| `local/no-banned-sleep` | "Synchronous Sleep" |
-| `local/no-fractional-ms-storage` | `$mdr:dev-core` § "Time Variables" integer `*Ms` storage |
-
-### Markdown Writes: Apply `fixMarkdown()` Before Writing; Banned: Raw `.md` Write Calls
-Markdown writes from TypeScript must apply `fixMarkdown()` before writing. Literal `.md` write calls are lint-checked by `local/no-bunwrite-md-without-fix`; see `$lib-markdown` § "Banned" for the canonical policy.
-
-### Banned: Bare `catch {}`; Catch Blocks Must Handle or Propagate
-Every `catch` block must rethrow, log via lib-log, or handle a named expected condition. Empty catches are lint-checked by `local/no-bare-catch`. Comment-only catches are allowed only when the comment names the expected condition, such as `ENOENT` or `client disconnected`.
-
-### Entry-Point Critical Guards: Wrap CLI `_main()` and Daemon Loops; Banned: Hand-Rolled Critical Catches
-Use `critGuardCli` and `critGuardDaemonLoop` from `@mdr/lib-utils/helpers/critical-guard` for TypeScript CLI and pmm-supervised daemon entry points.
-- CLI wrappers skip `[EXIT/4]` / `[EXIT/5]` structured exits and do not install death-watch.
-- Daemon wrappers auto-install death-watch by default; daemon SIGTERM handlers should call `await shutdown()` from `@mdr/lib-utils/logger`.
-- Inner+outer guard composition uses the string-key sentinel `CRIT_GUARD_FIRED_KEY`; outer catches downgrade to `log.error` with `correlatedFireKey`.
-- Per-iteration catches that absorb errors must escalate JS-class failures inline or with direct `log.critical`, using the same `siteKey`, `reproducer`, and `relevantFiles` shape.
-
-### Path Comparison: Use `realpathSync()`; Banned: `resolve()` for Deduplication
-Use `fs.realpathSync()` when comparing file paths; `path.resolve()` doesn't follow symlinks. Direct `resolve(a) === resolve(b)` comparisons are lint-checked by `local/no-resolve-for-path-compare` (warn).
-
-| Use Case | Function |
-|----------|----------|
-| Build paths (may not exist) | `path.resolve()` |
-| Compare/dedupe files | `fs.realpathSync()` |
-| Map/Set keys | `fs.realpathSync()` |
-| Display to user | `path.resolve()` |
-| File watcher callbacks | `fs.realpathSync()` |
-
-### Path Construction: Use `resolve()`; Banned: String Concatenation
-**Use `resolve()` over string concatenation** for building paths:
-
-`````typescript!
-// ✅ Correct - canonical path
-import { resolve } from 'path';
-const CONFIG_PATH = resolve(import.meta.dirname, '../assets/config.yml');
-
-// ❌ Wrong - leaves '..' unresolved
-const CONFIG_PATH = import.meta.dirname + '/../assets/config.yml';
-`````
-
-**Why:** String concatenation produces `/path/to/dir/../assets/config.yml` which works but isn't canonical. `resolve()` returns `/path/to/assets/config.yml` — cleaner for logging, debugging, and path comparisons.
-
-Note: `initEnv()` from `@mdr/lib-utils/env` does NOT need `resolve()` — it walks up from `import.meta.dirname` automatically. See `$lib-1password` Pattern B.
-
-### Config Loaders: No Env Overrides of `config.yml` by Default
-A TypeScript `config.{ts}` loader MUST NOT shape committed `config.yml` values from `process.env` — e.g. `const x = process.env.X ?? cfg.x` or `envVal ? { ...cfg, key: envVal } : cfg`. A stray shell export then silently changes shipped behavior. Add an env override only for a demonstrated runtime need (and justify it inline at the loader); secret/auth env vars (`*_API_KEY`, tokens) are credentials, not config, and are exempt. Full rule: `$dev-core` § "Banned: Env Vars Overriding `config.yml` Values by Default; Require Demonstrated Need".
-
-### CLI Argument Parsing: Use `@mdr/lib-argv`; Banned: Manual Parsing
-Use `@mdr/lib-argv` for shared minimist contracts: closed-surface unknown-flag rejection, `stopEarly` free-form parsing, positional string normalization, kebab-case flag reads, boolean short-flag chains, agent-safe output guards, negative integer option values, and pass-through argv splitting.
-
-Raw `minimist` is allowed only when the shared helper layer adds no value for that local surface. Never use manual patterns like `args.includes()`, `args.find()`, or `args.indexOf()` for CLI flag parsing.
-
-See `$mdr:lib-argv` for the detailed parsing norms and package API.
-
-### CLI Table Output: TypeScript-Specific Patterns
-Canonical listing conventions (datetime, sort, limit semantics, filter footers, spacing, and truncation) live in `$mdr:lib-list`. See `$mdr:dev-core` § "Table Output" for the cross-language rule (use a table library; banned manual `padEnd`/`padStart`) and § "--json Support" for the shared-pipeline rule. TypeScript-specific `cli-table3` mechanics below.
-
-**Use `@mdr/lib-list` helpers; banned: local duplicates.** Import shared CLI-list helpers from `@mdr/lib-list` instead of redefining them. Two tiers:
-- **Tier 1 (mandatory adoption where local duplicates exist):** `NO_BORDER`, `NO_PADDING`, `terminalColumns()`, `stripAnsi()`, `truncateCell()`, `formatLocalMinute()`, `formatRelativeAge()`, `stateColor(category)`, `gaugeColor(value, {warn, crit})`, `COLORS`. Banned: local copies of these (per `$dev-core` "Specialized Libraries Are the Canonical Home for Their Domain").
-- **Tier 2 (opt-in for regular rows×columns tables):** `renderList({ rows, columns, filters?, totalCount?, limit?, totalRow?, widthAllocator?, postTableLines?, json? })` returns a string; caller writes via `bunWrite('stdout', ...)`. Use only when the CLI is a single regular table; keep direct `cli-table3` for multi-table, preview-interleaved, or bespoke layouts.
-
-`````typescript!
-// ✅ Tier 1 — shared low-level helpers
-import { NO_BORDER, truncateCell, stateColor, formatRelativeAge } from '@mdr/lib-list';
-
-// ✅ Tier 2 — single regular table
-import { renderList } from '@mdr/lib-list';
-process.stdout.write(renderList({ rows, columns: [...], filters, totalCount, limit }) + '\n');
-`````
-
-**cli-table3 auto-sizing pitfall:** cli-table3 sizes each column to the widest cell across ALL rows, and `colSpan` distributes content width across all spanned columns, inflating every column's auto-size. To enforce max table width: (1) pre-compute max visible widths for all fixed columns across all rows, (2) derive the variable column's budget as `MAX_WIDTH - fixedColumnsTotal - gaps`, (3) truncate the variable column uniformly. Never use `colSpan` for content that should stay outside the column grid (e.g., preview lines) — render it outside the table and interleave with table output lines post-render. (2026-02: `colSpan: 7` preview rows inflated all columns; per-row CWD truncation failed because cli-table3 pads to table-wide max, not per-row max.)
-
-### CLI Design Principles
-See `$mdr:dev-core` § "CLI Development" for general principles (centralized parsing, `--json` support, consistent flags).
-
-**Prefer library over CLI for TypeScript-to-TypeScript calls.** When a TypeScript project provides both a library API and a CLI, prefer importing the library directly over spawning the CLI:
-
-`````typescript!
-// ❌ Avoid - shelling out to CLI from TypeScript
-import { execSync } from 'child_process';
-execSync('tg send --project mdr "Hello"');
-
-// ✅ Prefer - direct library import
-import { send, getChatIdForProject } from '@mdr/chat-telegram';
-await send({ from: 'my-project', channel: String(getChatIdForProject('mdr')), text: 'Hello' });
-`````
-
-**Why:** Avoids PATH issues, type-safe, no subprocess overhead, no string escaping.
-
-**Bun TTY input after readline is unreliable on macOS.** After a readline interface opens, Bun may not deliver later stdin `data` events reliably, even through a fresh `tty.ReadStream(0)`. For "accept input while loading" UX, prefer explicit flags, startup pre-buffer detection before opening readline, or subprocess-owned TTY reads.
-
-### Code Style: Single-Line Preference
-**Prefer single-line when it fits (<100 chars):** imports (<6 items), objects (<4 props), function signatures, guard clauses (braceless `if (err) return`), simple if (no else).
-
-**if/else pairs:** Always multi-line with braces on both branches.
-**if/else if chains:** Use for mutually exclusive conditions on same variable, even with early returns.
-
-`````typescript!
-// Guard clauses: braceless OK
-if (err) return reject(new Error('Timeout'));              // ✅
-
-// if/else: multi-line, braces on both
-if (x) {                                                   // ✅
-  doA();
-} else {
-  doB();
-}
-
-// Object passing: don't destructure + reconstruct
-return obj;                                                // ✅ (not { a: obj.a, b: obj.b })
-`````
-
-**Multi-line OK:** complex nested objects, configs with many properties.
-**Keep var/function separate when:** used multiple times, name adds semantic clarity, or logic is >5 lines.
-**Single-use private methods:** inline into caller. **Duplicated code (>3 lines):** extract `_helper()`.
-**Detached promises:** Intentionally detached promises must attach an explicit owner `.catch()` at the detach site; changing the caller to `await` changes latency and failure semantics.
-**Comments for non-obvious returns:** `return { type: 'noop' }; // Our own write`
-**JSDoc:** Add `@example` for complex object parameters (WebSocket messages, API shapes).
-
-### Synchronous Sleep: Use `Atomics.wait`; Banned: `execSync('sleep')`, `Bun.sleepSync`
-In async functions, use `await new Promise(r => setTimeout(r, delayMs))`. In sync contexts where `await` is unavailable, use `Atomics.wait`. Banned sleep forms are lint-checked by `local/no-banned-sleep`.
-
-### `bun:sqlite` in Daemons: Yield Between Batches; Banned: Unbounded Sync Loops
-`bun:sqlite` sync API is faster than async for typical queries (no thread-pool hop, no Promise overhead). But in long-running daemons with timers (`setInterval`, health writers), a tight loop of sync queries (batch INSERTs, FTS rebuilds) blocks the event loop and starves timer callbacks. Yield with `await new Promise(r => setTimeout(r, 0))` between batches or sources.
-
-### Timeouts: Use `execWithLog` for `execFileSync`; Log Before Throwing
-Timeout-killed paths must log `{ cmd / what-we-were-waiting-for, elapsedMs, budgetMs }` before rethrowing. Prefer `execWithLog` from `@mdr/lib-utils/helpers` for `execFileSync`; bare `execFileSync`/`execSync` calls with `timeout:` are lint-checked by `local/require-exec-with-log` (warn) unless a surrounding catch references `ETIMEDOUT`.
-
-### `tt` Watchers: Follow `$dev-core` and Use `@mdr/lib-watch`
-For TypeScript code inside the `tt` monorepo, follow `$dev-core`'s file-watching rule: use `@mdr/lib-watch` instead of open-coded `fs.watch` / `fs.watchFile` loops.
-
-## 2. Testing & Verification
-See `$mdr:dev-core` § "Testing" for directory structure, fixtures, and banned patterns.
-
-### Test Organization (TypeScript-Specific)
-When a project has a `_TEST.md` spec file:
-- **Test file naming**: Use prefix matching _TEST.md sections (e.g., `A.operations.test.ts` → Section A)
-- **Test names**: Include spec ID directly in `it()`: `it('A.1: AddTaskOp (With Index)', () => {`
-
-### Global Setup for Vitest
-Return teardown function from setup (vitest pattern). If using lib-log, call `await shutdown()` from `@mdr/lib-utils/logger` in teardown.
-
-### Exercising `bun:ffi`/`bun:sqlite` from Vitest Tests: Shell Out to `bun -e`; Banned: `bun --bun vitest` (2026-04)
-Vitest 3.2.4 under Bun 1.3.11 still fails (both `--pool=threads` and `--pool=forks`, verified 2026-04). If the project IS the FFI library, use `bun test` natively. If it CONSUMES an FFI lib from vitest, shell out via `execSync("bun -e ...")` for contract-test assertions — canonical examples and rationale in `$mdr:lib-proc` SKILL.md.
-
-Do not weaken production Bun imports just to satisfy Vitest's Node collection path. For consumers whose shipped runtime is Bun, keep the production import direct and make the test boundary mock the FFI module or shell out to `bun -e` for the contract path.
-
-Bun-native tests should import from `bun:test` when they are not using Vitest globals; synthetic global references break typecheck when the installed type package lacks that subpath.
-
-### CLI Wrapper Smoke Test: Required for Every `scripts/X` Wrapper
-Every TypeScript port that ships a `scripts/X` bash wrapper MUST include at least one Vitest test that invokes the shipped wrapper end-to-end.
-
-Use `execFileSync('<scriptname>', ['--help'])` or another non-destructive flag, then match output with a regex or `expect(...).toContain(...)`. The smoke test must be reachable through the associated `$dev-test`-registered `package.json` test script. This catches failures that `src/lib` unit tests miss: missing `bun install`, broken `install-on-missing-deps`, Bun shebang resolution, and module-load errors.
-
-After the one required shipped-wrapper smoke, CLI behavior tests MUST NOT spawn `scripts/X` again. Prefer in-process dispatch or library tests (`_main`, `runCli`, parser helpers) for parser, help-text, and command logic. Spawn the direct entrypoint (`bun src/cli/X.ts`) only for process-level contracts such as exit-code tiers, stderr stack-trace cleanliness, stdout, and color. Reserve repeated shipped-wrapper spawns for explicit `test:e2e` shipped-binary suites.
-
-Prefer non-destructive getter calls such as `X --help`, `X list`, or `X status` over setters. Wrapper smoke tests run repeatedly, so a mutating smoke test is a footgun.
-
-`````typescript!
-import { execFileSync } from 'node:child_process';
-
-it('smokes the shipped wrapper', () => {
-  const output = execFileSync('scripts/X', ['--help'], { encoding: 'utf8', timeout: 10000 });
-  expect(output).toContain('Usage:');
-});
-`````
-
-Run through the package test script when one exists; otherwise use `./node_modules/.bin/vitest`, never bare `vitest`.
-
-### Child Processes in Tests MUST Pass `timeout`; Banned: Untimed `spawnSync`/`execSync`/`execFileSync`/`Bun.spawnSync`
-Every synchronous child-process call in tests — `spawnSync()`, `execSync()`, `execFileSync()`, and `Bun.spawnSync()` — MUST pass an explicit `timeout` (10000-30000ms; ~2x the slowest observed run) so a hung child fails at the call site instead of blocking the JS thread until the outer `dt`/Vitest budget kills the suite. Applies to wrapper smoke tests, dynamic CLI-dispatch tests, e2e CLI helpers, and `bun -e` contract shells; shared `_run()`-style helpers set the timeout once for every caller.
-
-### `critGuardCli` Structured-Exit Tests: Clean Up Process-Level State
-Tests that exercise `critGuardCli` or `[EXIT/4]` / `[EXIT/5]` branches must verify file-level cleanup, not only the caught throw. If the test installs temporary listeners, stubs logger shutdown, or catches a structured exit, restore that state in `afterEach` and run the whole file; passing individual assertions is not enough when leaked state makes the file red.
-
-### Local Rule Package Smoke Test: Use Real `eslint --config`
-TypeScript packages that ship custom ESLint rules or plugin configs MUST include a smoke that runs the built plugin through the real `eslint --config` path. RuleTester coverage is not enough: it does not prove package export resolution, config loading, full-AST traversal, or shell-string matching under the shipped CLI boundary.
-
-### Definition of Done: Work Is NOT Done Until `bun run test` Has Been Run
-For TypeScript projects with a `test` script, work is not done until `bun run test` has been run in the current worktree after the final code changes.
-
-Test-script names follow `$dev-test` "Test Script Naming Standard".
-
-`bun run lint`, `bun run typecheck`, and focused Vitest commands are useful while iterating, but they are not sufficient to claim completion. They are debugging steps, not the final verification gate.
-
-Remember that `bun run test` is the repo's default lane, not automatically the full suite. If the named gate for the task is `test:e2e`, `test:all`, or another explicit lane, run that exact lane in addition to the default entrypoint.
-
-Only skip `bun run test` when the project truly does not provide it or it cannot run in the current environment, and in that case explicitly say so in the final report.
-
-### Verification
-After setup, verify:
-1. Symlinked script works: `which book` → `~/mnt/.bin/book`
-2. Final gate: `bun run test`
-3. Optional drill-down after failures: `bun run typecheck`, focused Vitest commands, or individual repro commands
-4. For changed package exports, a real consumer resolves the installed export path.
-5. For dependency additions, removals, or swaps: run the package install path and inspect the package manifest plus lockfile delta so stale `node_modules` cannot hide a missing or lingering dependency.
-
-**Banned:** bare `vitest` in shell commands. Use package scripts (or `./node_modules/.bin/vitest` if no package script).
-
-## 3. Shell Conventions
-See `$mdr:dev-bash` for bash wrapper script and sourceable library conventions: shebang policy, ESTALE retry, `lib-log` bash emitter routing, `ccsync warm`, broken `link:` repair, bash-builtin-vs-shell-out tradeoff, and the `install-on-missing-deps` tier-timing reference profile.
 
 ================
 File: edit-skill/SKILL.md
@@ -569,6 +151,7 @@ All skills must follow the naming conventions in CONTRIBUTING.md. Key prefixes:
 - **help-***: Operational guides for third-party CLI tools (e.g., help-claude, help-codex, help-gemini)
 - **cli-***: Our own CLI tools with source code (e.g., cli-mdr, cli-repomix, cli-tt, cli-bash)
 - **dev-***: Development tooling & workflows (e.g., dev-mcp-server)
+- **lint-***: Single owning skill per file type — conventions + linter + coverage-enforced checklist (e.g., lint-typescript, lint-markdown); see `$lint-core` for family doctrine. Distinct from quality-only overlays like `lint-ts-tests`.
 - **ops-***: Operations & infrastructure tools (e.g., ops-git, ops-pmm)
 - **test-***: Testing tools & workflows (e.g., test-mcp-server, test-playwright)
 - **interface-***: ChatGPT.com customization (e.g., interface-chatgpt-memory)
@@ -610,7 +193,7 @@ This boundary is **orthogonal to npm package boundary**. One npm package can cle
 
 **Decision test when adding a subsystem:** "Would an agent spawned at cwd=X benefit from a NARROWER auto-loaded context than the host skill provides?" Yes → sibling skill. No → bundle into the host skill. Do not conflate this with package decisions; argue the two axes separately.
 
-- **HOW to split:** Sub-skill exports a library entry (e.g. `runRunsCommand(argv)`); host hoists it in one line via dynamic import. Add a standalone CLI binary only when users actually invoke it directly (e.g. `tkt`). Extends `$dev-typescript` § "CLI Design Principles" → "Prefer library over CLI for TypeScript-to-TypeScript calls".
+- **HOW to split:** Sub-skill exports a library entry (e.g. `runRunsCommand(argv)`); host hoists it in one line via dynamic import. Add a standalone CLI binary only when users actually invoke it directly (e.g. `tkt`). Extends `$lint-typescript` § "CLI Design Principles" → "Prefer library over CLI for TypeScript-to-TypeScript calls".
 
 ## YAML Metadata
 
@@ -750,7 +333,7 @@ Syncs skill resources to central locations:
 - **Scripts** (`scripts/*`) → `~/mnt/.bin/`
 - **Commands** (`commands/*.md`) → `~/mnt/mdr/commands/`
 - **Workflows** (`commands/N-*.md`) → `~/mnt/mdr/commands/workflows/`
-- **ESLint configs** (`mdr/skills/*/eslint.config.js`) → symlinks to `$dev-typescript/assets/templates/eslint.config.js`
+- **ESLint configs** (`mdr/skills/*/eslint.config.js`) → symlinks to `$lint-typescript/assets/templates/eslint.config.js`
 - Cleanup must only remove same-name symlinks in `~/mnt/.bin` that resolve into a skill's own `scripts/` directory. Preserve intentional aliases and any link whose target is outside `skills/*/scripts/`.
 - `ccsync config-sync` only links clone-class configs. Any regular owned `eslint.config.js` with extra rules/plugins or `tsconfig.check.json` with real overrides is treated as intentional customization and left owned. Use `--only eslint` or `--only tsconfig-check` to target one spec.
 - `ccsync lint` scans live `scripts/*` wrappers and `SKILL.md` metadata, then flags Bun/Node/TSX entrypoints that bypass `install-on-missing-deps` plus mechanical description/keyword routing violations. It also flags `tsconfig.check.json` config drift: an owned (regular-file) config that classifies as a template clone is reported as `owned-clone-config` (it should be a symlink to the shared template); genuinely-custom configs and symlinks pass.
@@ -1814,7 +1397,7 @@ Every external API call MUST log one durable after-return Axiom row, preferably 
 - Runtime home is cron, not pmm: see `CONTRIBUTING.md` "CLI Volume Tripwire" for the choice.
 
 ### CLI Logging Policy
-Script entrypoints should declare lifecycle timing through the entry logger so Axiom is the usage and wall-time oracle; this is audit-enforced by `$dev-typescript/audit/checklist.md`.
+Script entrypoints should declare lifecycle timing through the entry logger so Axiom is the usage and wall-time oracle; this is audit-enforced by `$lint-typescript/audit/checklist.md`.
 
 `````typescript!
 const log = createLogger('mdr:ops-pmm:cli', { timing: 'cli' });
@@ -2658,7 +2241,7 @@ File: lib-utils/CLAUDE.md
 ================
 ---
 requiredSkills:
-  - mdr:dev-typescript
+  - mdr:lint-typescript
   - mdr:lib-1password
   - mdr:lib-log
   - mdr:edit-skill
@@ -2668,7 +2251,7 @@ requiredFiles:
   - src/logger.ts
 ---
 
-# lib-utils (48.2k)
+# lib-utils (49.2k)
 ## Documentation (8.2k)
 - [@SKILL.md (5k)](https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g)
 - @CONTRIBUTING.md (600)
@@ -2681,13 +2264,13 @@ requiredFiles:
 - @src/env.ts (800)
 - @src/logger.ts (1.5k)
 
-## requiredSkills (34k)
-- [@../dev-typescript/SKILL.md (8k)](https://hackmd.io/b6Gk5_TVRU2ggO4RHgVUSQ)
+## requiredSkills (35k)
+- [@../lint-typescript/SKILL.md (8k)](https://hackmd.io/b6Gk5_TVRU2ggO4RHgVUSQ)
   - [@SKILL.md (5k)](https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g)
 - [@../lib-1password/SKILL.md (3k)](https://hackmd.io/p4SYLbb2Q46I-ajQH8jeyg)
 - [@../lib-log/SKILL.md (11k)](https://hackmd.io/NW6P7MmBT96KIwz_njPGNg)
   - [@../lib-log/README.md (2k)](https://hackmd.io/98bb5aKLTJaVKrvs9IpMlg)
-- [@../edit-skill/SKILL.md (5k)](https://hackmd.io/KP6XTElkQXuNXale7a0AOQ)
+- [@../edit-skill/SKILL.md (6k)](https://hackmd.io/KP6XTElkQXuNXale7a0AOQ)
 
 ================
 File: lib-utils/CONTRIBUTING.md
@@ -2802,12 +2385,13 @@ File: lib-utils/package.json
     "lint:fix": "eslint '{src,test}/**/*.ts' --fix",
     "test": "bun run lint && bun run typecheck && bun run test:unit",
     "test:unit": "dt wrap -- timeout --foreground 300 ./node_modules/.bin/vitest run test/unit --passWithNoTests",
+    "test:e2e": "dt wrap -- timeout --foreground 300 ./node_modules/.bin/vitest run test/e2e",
     "with-lock:install": "with-lock --project-root . -- bun install",
     "preinstall": "with-lock preinstall-guard"
   },
   "devDependencies": {
     "@eslint/js": "8.57.0",
-    "@mdr/dev-typescript": "link:@mdr/dev-typescript",
+    "@mdr/lint-typescript": "link:@mdr/lint-typescript",
     "@types/node": "20.13.0",
     "dotenv": "17.2.3",
     "eslint": "8.57.0",
@@ -2972,7 +2556,7 @@ Correct shape:
 log.debug('thing happened', { field1, field2 });
 `````
 
-The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `LOG_LEVEL=debug` via `overmind.env`. All levels still ship to Axiom.
+The shared `install-on-missing-deps` wrapper (`$lint-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `LOG_LEVEL=debug` via `overmind.env`. All levels still ship to Axiom.
 
 ### Browser - createLogger(project-name)
 For frontend/browser environments (e.g., React apps bundled with Vite):
@@ -3107,6 +2691,425 @@ initEnv(import.meta.dirname, [], customLogger);           // custom logger (must
 
 ## Scripts
 `scripts/_LIB-UTILS_update-dependents` - Updates all lib-utils dependents. Run with `--help` for usage.
+
+================
+File: lint-typescript/SKILL.md
+================
+---
+name: lint-typescript
+description: >-
+  This skill should be used when working with TypeScript and Bun projects. Projects normally use Bun to run TypeScript directly, except Node-runtime consumers require compiled `dist/.js` exports. Keywords: "TypeScript", "TS", "Bun" Scripts: "install-on-missing-deps", "with-lock"
+requiredSkills:
+  - mdr:lib-utils
+hackmd: https://hackmd.io/b6Gk5_TVRU2ggO4RHgVUSQ
+---
+
+# TypeScript Development Best Practices
+
+For project bootstrap, templates, install wrappers, Bun setup, package scripts, local dependencies, and NFS native dependency notes, read `references/project-setup.md`.
+
+Default runtime is Bun direct-from-`src/`. Exception: packages exporting symbols loaded by Node-runtime tools must ship compiled `dist/.js` exports; see `references/project-setup.md` "Exception: Library Packages with Node-Runtime Consumers".
+
+## TABLE OF CONTENTS
+- 1\. Code Conventions
+    - Class vs Type/Interface: Use Class for Methods/Serialization; Type for Data-Only
+    - Prefer String Literals Over Enums
+    - Trust TypeScript Types: Banned: Redundant Runtime Type Checks
+    - Narrow Types by Default; Banned: `[key: string]: unknown` Without a Named Consumer
+    - Internal Functions
+    - Export Policy: Name Public Exports Explicitly; Banned: `export *`
+    - JSDoc: Add `/** */` Above Every Function, Class, and Interface
+    - Interface Placement: Co-locate Types Above Their Primary Function
+    - Module Splitting
+    - Lint Errors: Fix, Don't Suppress
+    - Markdown Writes: Apply `fixMarkdown()` Before Writing; Banned: Raw `.md` Write Calls
+    - Banned: Bare `catch {}`; Catch Blocks Must Handle or Propagate
+    - Entry-Point Critical Guards: Wrap CLI `_main()` and Daemon Loops; Banned: Hand-Rolled Critical Catches
+    - Path Comparison: Use `realpathSync()`; Banned: `resolve()` for Deduplication
+    - Path Construction: Use `resolve()`; Banned: String Concatenation
+    - Config Loaders: No Env Overrides of `config.yml` by Default
+    - CLI Argument Parsing: Use `@mdr/lib-argv`; Banned: Manual Parsing
+    - CLI Table Output: TypeScript-Specific Patterns
+    - CLI Design Principles
+    - Code Style: Single-Line Preference
+    - Synchronous Sleep: Use `Atomics.wait`; Banned: `execSync('sleep')`, `Bun.sleepSync`
+    - `bun:sqlite` in Daemons: Yield Between Batches; Banned: Unbounded Sync Loops
+    - Timeouts: Use `execWithLog` for `execFileSync`; Log Before Throwing
+    - `tt` Watchers: Follow `$dev-core` and Use `@mdr/lib-watch`
+- 2\. Testing & Verification
+    - Test Organization (TypeScript-Specific)
+    - Global Setup for Vitest
+    - Exercising `bun:ffi`/`bun:sqlite` from Vitest Tests
+    - CLI Wrapper Smoke Test: Lives in `test/e2e/**`, Banned in `test/unit/**`
+    - Child Processes in Tests MUST Pass `timeout`; Banned: Untimed `spawnSync`/`execSync`/`execFileSync`/`Bun.spawnSync`
+    - `critGuardCli` Structured-Exit Tests: Clean Up Process-Level State
+    - Local Rule Package Smoke Test: Use Real `eslint --config`
+    - Definition of Done: Work Is NOT Done Until `bun run test` Has Been Run
+    - Verification
+- 3\. Shell Conventions
+
+## 1. Code Conventions
+
+### Class vs Type/Interface: Use Class for Methods/Serialization; Type for Data-Only
+**Use class when the type needs methods (especially serialization).** Data-only types stay as type aliases or interfaces.
+
+`````typescript!
+// ✅ Data-only → type alias
+type Plan = Map<string, Section>
+
+// ✅ Wire entity with serialization → class
+class PlanFile {
+  constructor(public plan: Plan, public _mtime?: number, public _path?: string) {}
+  toJSON() { /* Socket.io auto-calls */ }
+  static fromJSON(obj: any): PlanFile { /* reconstruct from JSON */ }
+}
+`````
+
+**Discriminated unions over undefined:**
+
+`````typescript!
+// ❌ Avoid - undefined mixed with object types
+function process(): { data: T } | { error: string } | undefined
+
+// ✅ Prefer - explicit discriminated union with type field
+function process(): { type: 'success'; data: T } | { type: 'error'; error: string } | { type: 'noop' }
+`````
+
+Enables clean switch statements and makes "nothing to do" explicit rather than implicit.
+
+**Derive types instead of duplicating:**
+
+`````typescript!
+// ❌ Avoid - duplicates PlanFile.toJSON() return shape
+interface PlanFileData {
+  plan: Record<string, unknown>;
+  _mtime?: number;
+  _path?: string;
+}
+
+// ✅ Prefer - derive from existing type
+type PlanFileJson = ReturnType<PlanFile['toJSON']>;
+`````
+
+Use `ReturnType<>`, `Parameters<>`, `Awaited<>` to derive types from existing functions/methods. Keeps types in sync and reduces duplication.
+
+### Prefer String Literals Over Enums
+Prefer zero-runtime string literal unions over string-valued enums. Numeric mapping enums, such as HTTP status code maps, are the allowed exception. String enums are lint-checked by `local/prefer-string-literal-union` (warn).
+
+### Trust TypeScript Types: Banned: Redundant Runtime Type Checks
+Don't add runtime type checks (`Array.isArray`, `typeof`) when TypeScript types already guarantee the shape. Push filtering/transformation into library calls when possible. Use `ReturnType<>`, `Parameters<>` to derive types instead of duplicating. Use `Object.fromEntries()`, `.map()`, `.filter()` over imperative loops. Don't reimplement library features (e.g., socket.io has built-in reconnection).
+
+**Use objects directly** when they already match the required shape:
+
+`````typescript!
+// ❌ Avoid - unnecessary destructure/reconstruct
+socket.emit('planFile:data', { plan: planFile.plan, _mtime: planFile._mtime, _path: planFile._path });
+// ✅ Prefer - object already has the right shape
+socket.emit('planFile:data', planFile);
+`````
+
+**When reconstruction IS needed:** adding/removing fields, renaming fields, transforming values.
+
+### Narrow Types by Default; Banned: `[key: string]: unknown` Without a Named Consumer
+TS-specific manifestation of `$dev-core` "Don't design API surface 'just in case'".
+
+Use narrow object shapes by default. Wide index signatures like `[key: string]: unknown` and broad `Record<string, unknown>` types defeat TypeScript's ability to verify named fields, so reserve them for real dynamic-key surfaces.
+
+Only use a wide shape when a named consumer reads arbitrary keys today. If all current consumers read known properties, model those properties directly.
+
+### Internal Functions
+See `$mdr:dev-core` § "Internal Functions". Use `_` prefix for non-exported functions.
+
+### Export Policy: Name Public Exports Explicitly; Banned: `export *`
+See `$mdr:dev-core` § "Export Policy" for the canonical public-vs-internal definition. Minimize exports.
+
+**Banned: wildcard barrel re-exports (`export *`).** A package's barrel (`src/index.ts`) and each `package.json` `exports` subpath MUST name every public symbol explicitly (`export { foo, bar } from './x.js'`). `export *` auto-publishes every declaration-site `export`, which (a) erases the public/internal boundary — an `_`-helper exported for a test silently leaks into the package surface — and (b) forces `$edit-readme` to guess what's public. The explicit named barrel IS the package's public API: it's the list `$edit-readme` documents.
+
+`local/jsdoc-required` keys on **declaration-site** `export` of non-`_` names (not barrel membership) and skips `_`-prefixed/`private`/`protected` even when exported. So treat any non-`_` `export` as public: name it in the barrel, JSDoc it, document it. A cross-file helper you do NOT want public gets the `_` prefix — then it is lint- and README-exempt and may still be `export`ed for tests. The template ESLint rule `local/no-export-all` enforces the `export *` ban for packages using the shared `$lint-typescript` config.
+
+**Gotcha: removing a barrel export needs the package's real `bun run test`, not typecheck-only.** `tsc` resolves `.js` import specifiers without verifying the named export still exists, so a test (or any consumer) still importing a just-removed barrel symbol passes `tsc` but fails at runtime (`X is not a function`). When you remove or demote a barrel export, gate with the package's real `bun run test` (vitest), not focused `tsc` alone — and migrate any remaining intra-package/test importer to a relative source path (`../../src/x.js`).
+
+**Authored docs count as consumers before export demotion.** Before removing or demoting an exported symbol, search shipped docs and generated context manifests that teach or require that symbol, not only source imports. A symbol referenced from `SKILL.md`, `CONTRIBUTING.md`, examples, audit checklists, or required-file manifests is still a public contract until that prose is migrated or deleted in the same change.
+
+### JSDoc: Add `/** */` Above Every Function, Class, and Interface
+Every PUBLIC exported function, class, method, and interface MUST have a `/** */` comment. Internal helpers (`_`-prefix names, `private`/`protected` class members, non-exported functions) are exempt; the lint rule `local/jsdoc-required` enforces this scope. Scale detail to complexity: simple getters get a one-liner, complex methods get multi-line with context. Classes that own lifecycle or orchestration should document the full lifecycle (numbered steps from creation to teardown).
+
+Public export rule:
+- Public exported functions and methods MUST include `@param` tags for every parameter.
+- Public exported functions and methods MUST include an explicit `@returns` tag.
+- Internal helpers can keep lighter JSDoc when the signature is already obvious.
+
+Use `@example` for complex object parameters (WebSocket messages, API shapes).
+
+### Interface Placement: Co-locate Types Above Their Primary Function
+Place exported types/interfaces directly above the function that uses them (as return type or parameter), below the JSDoc:
+
+`````typescript!
+/**
+ * Get session info from state directory
+ * @returns Session info or undefined
+ */
+export interface SessionInfo {
+  sessionId: string;
+  mtime: number;
+}
+export function getSessionInfo(paneId: string): SessionInfo | undefined {
+`````
+
+Co-locates the type with its primary usage. Applies to both return types and parameter types when that type is only used by one function.
+
+### Module Splitting
+Consider splitting modules when some exports have heavy dependencies and others don't. This lets consumers import only what they need without loading the entire dependency tree.
+
+`````typescript!
+// Before: barrel file forces all deps to load
+// lib/index.ts
+export * from './heavy-collection.js';  // imports runtime tooling, NFS, child_process
+export * from './light-reader.js';      // just fs.readFileSync
+
+// After: split so light consumers don't pay for heavy deps
+// lib/light-reader.ts - standalone, no heavy imports
+export function readCached() { /* just fs */ }
+
+// lib/heavy-collection.ts
+import { readCached } from './light-reader.js';  // re-use
+export { readCached };  // re-export for barrel compatibility
+export async function collectFresh() { /* heavy deps */ }
+`````
+
+**CLI fast-path optimization:** When a CLI has fast paths (cache reads) and slow paths (browser automation, heavy processing), use dynamic `import()` to avoid loading heavy deps on fast paths:
+
+`````typescript!
+// cli.ts - entry point, handles cache reads (no heavy deps)
+if (!live && hasCachedData()) {
+  return outputCached();  // Fast: no Playwright loaded
+}
+// Lazy-load only when needed
+const { getAccountUsage } = await import('./browser.js');  // browser.js imports Playwright
+`````
+
+Real example: `www-claude-usage` reduced cache-path startup from 0.6s → 0.15s by splitting browser automation into `browser.ts`.
+
+**Subpath splits: physical move; Banned: re-export from original.** When splitting a module into `package.json` `exports` subpaths, move function bodies to their new file. Re-exporting from the original defeats dependency isolation -- consumers still load the original module's full dependency tree.
+
+After adding or moving a package export subpath, verify at least one real installed consumer can resolve the exported path before restarting daemons or declaring done. Source-local typecheck is not enough when linked dependency snapshots or Node/Bun loaders see a different export surface.
+
+When a dependency or helper moves from sync/CommonJS to async ESM, sweep lazy loaders in the touched module for `require(` / `createRequire()` and convert them to `await import(...)` where the call path is already async. Typecheck alone can miss this because the failure appears at runtime after dependency semantics change.
+
+#### No Top-Level `await` in Library Barrels
+Library barrels (`src/lib/index.ts`, `src/index.ts`) MUST NOT contain `await` at module scope — top-level `await` creates a TDZ window during cold-start re-entry. Async setup belongs at the CLI/application entry point, not the barrel. The one allowed barrel-level call is a synchronous secret-owning `initEnv()` (see `$lib-1password` "Pattern B: TypeScript"). Grep: `rg -n '^await ' src/lib/index.ts src/index.ts`.
+
+### Lint Errors: Fix, Don't Suppress
+See `$mdr:dev-core` § "Lint Errors". Never use `// eslint-disable` or `@ts-ignore`.
+
+For `mdr/skills/*`, `eslint.config.js` should usually be a symlink to `lint-typescript/assets/templates/eslint.config.js`. A regular owned `eslint.config.js` means the package intentionally customizes lint rules or plugins.
+
+Local lint rules enforce the automatable TypeScript policy surface:
+
+| Rule | Source policy |
+|------|---------------|
+| `local/no-bare-catch` | "Banned: Bare `catch {}`" |
+| `local/no-banned-sleep` | "Synchronous Sleep" |
+| `local/no-fractional-ms-storage` | `$mdr:dev-core` § "Time Variables" integer `*Ms` storage |
+
+### Markdown Writes: Apply `fixMarkdown()` Before Writing; Banned: Raw `.md` Write Calls
+Markdown writes from TypeScript must apply `fixMarkdown()` before writing. Literal `.md` write calls are lint-checked by `local/no-bunwrite-md-without-fix`; see `$lib-markdown` § "Banned" for the canonical policy.
+
+### Banned: Bare `catch {}`; Catch Blocks Must Handle or Propagate
+Every `catch` block must rethrow, log via lib-log, or handle a named expected condition. Empty catches are lint-checked by `local/no-bare-catch`. Comment-only catches are allowed only when the comment names the expected condition, such as `ENOENT` or `client disconnected`.
+
+### Entry-Point Critical Guards: Wrap CLI `_main()` and Daemon Loops; Banned: Hand-Rolled Critical Catches
+Use `critGuardCli` and `critGuardDaemonLoop` from `@mdr/lib-utils/helpers/critical-guard` for TypeScript CLI and pmm-supervised daemon entry points.
+- CLI wrappers skip `[EXIT/4]` / `[EXIT/5]` structured exits and do not install death-watch.
+- Daemon wrappers auto-install death-watch by default; daemon SIGTERM handlers should call `await shutdown()` from `@mdr/lib-utils/logger`.
+- Inner+outer guard composition uses the string-key sentinel `CRIT_GUARD_FIRED_KEY`; outer catches downgrade to `log.error` with `correlatedFireKey`.
+- Per-iteration catches that absorb errors must escalate JS-class failures inline or with direct `log.critical`, using the same `siteKey`, `reproducer`, and `relevantFiles` shape.
+
+### Path Comparison: Use `realpathSync()`; Banned: `resolve()` for Deduplication
+Use `fs.realpathSync()` when comparing file paths; `path.resolve()` doesn't follow symlinks. Direct `resolve(a) === resolve(b)` comparisons are lint-checked by `local/no-resolve-for-path-compare` (warn).
+
+| Use Case | Function |
+|----------|----------|
+| Build paths (may not exist) | `path.resolve()` |
+| Compare/dedupe files | `fs.realpathSync()` |
+| Map/Set keys | `fs.realpathSync()` |
+| Display to user | `path.resolve()` |
+| File watcher callbacks | `fs.realpathSync()` |
+
+### Path Construction: Use `resolve()`; Banned: String Concatenation
+**Use `resolve()` over string concatenation** for building paths:
+
+`````typescript!
+// ✅ Correct - canonical path
+import { resolve } from 'path';
+const CONFIG_PATH = resolve(import.meta.dirname, '../assets/config.yml');
+
+// ❌ Wrong - leaves '..' unresolved
+const CONFIG_PATH = import.meta.dirname + '/../assets/config.yml';
+`````
+
+**Why:** String concatenation produces `/path/to/dir/../assets/config.yml` which works but isn't canonical. `resolve()` returns `/path/to/assets/config.yml` — cleaner for logging, debugging, and path comparisons.
+
+Note: `initEnv()` from `@mdr/lib-utils/env` does NOT need `resolve()` — it walks up from `import.meta.dirname` automatically. See `$lib-1password` Pattern B.
+
+### Config Loaders: No Env Overrides of `config.yml` by Default
+A TypeScript `config.{ts}` loader MUST NOT shape committed `config.yml` values from `process.env` — e.g. `const x = process.env.X ?? cfg.x` or `envVal ? { ...cfg, key: envVal } : cfg`. A stray shell export then silently changes shipped behavior. Add an env override only for a demonstrated runtime need (and justify it inline at the loader); secret/auth env vars (`*_API_KEY`, tokens) are credentials, not config, and are exempt. Full rule: `$dev-core` § "Banned: Env Vars Overriding `config.yml` Values by Default; Require Demonstrated Need".
+
+### CLI Argument Parsing: Use `@mdr/lib-argv`; Banned: Manual Parsing
+Use `@mdr/lib-argv` for shared minimist contracts: closed-surface unknown-flag rejection, `stopEarly` free-form parsing, positional string normalization, kebab-case flag reads, boolean short-flag chains, agent-safe output guards, negative integer option values, and pass-through argv splitting.
+
+Raw `minimist` is allowed only when the shared helper layer adds no value for that local surface. Never use manual patterns like `args.includes()`, `args.find()`, or `args.indexOf()` for CLI flag parsing.
+
+See `$mdr:lib-argv` for the detailed parsing norms and package API.
+
+### CLI Table Output: TypeScript-Specific Patterns
+Canonical listing conventions (datetime, sort, limit semantics, filter footers, spacing, and truncation) live in `$mdr:lib-list`. See `$mdr:dev-core` § "Table Output" for the cross-language rule (use a table library; banned manual `padEnd`/`padStart`) and § "--json Support" for the shared-pipeline rule. TypeScript-specific `cli-table3` mechanics below.
+
+**Use `@mdr/lib-list` helpers; banned: local duplicates.** Import shared CLI-list helpers from `@mdr/lib-list` instead of redefining them. Two tiers:
+- **Tier 1 (mandatory adoption where local duplicates exist):** `NO_BORDER`, `NO_PADDING`, `terminalColumns()`, `stripAnsi()`, `truncateCell()`, `formatLocalMinute()`, `formatRelativeAge()`, `stateColor(category)`, `gaugeColor(value, {warn, crit})`, `COLORS`. Banned: local copies of these (per `$dev-core` "Specialized Libraries Are the Canonical Home for Their Domain").
+- **Tier 2 (opt-in for regular rows×columns tables):** `renderList({ rows, columns, filters?, totalCount?, limit?, totalRow?, widthAllocator?, postTableLines?, json? })` returns a string; caller writes via `bunWrite('stdout', ...)`. Use only when the CLI is a single regular table; keep direct `cli-table3` for multi-table, preview-interleaved, or bespoke layouts.
+
+`````typescript!
+// ✅ Tier 1 — shared low-level helpers
+import { NO_BORDER, truncateCell, stateColor, formatRelativeAge } from '@mdr/lib-list';
+
+// ✅ Tier 2 — single regular table
+import { renderList } from '@mdr/lib-list';
+process.stdout.write(renderList({ rows, columns: [...], filters, totalCount, limit }) + '\n');
+`````
+
+**cli-table3 auto-sizing pitfall:** cli-table3 sizes each column to the widest cell across ALL rows, and `colSpan` distributes content width across all spanned columns, inflating every column's auto-size. To enforce max table width: (1) pre-compute max visible widths for all fixed columns across all rows, (2) derive the variable column's budget as `MAX_WIDTH - fixedColumnsTotal - gaps`, (3) truncate the variable column uniformly. Never use `colSpan` for content that should stay outside the column grid (e.g., preview lines) — render it outside the table and interleave with table output lines post-render. (2026-02: `colSpan: 7` preview rows inflated all columns; per-row CWD truncation failed because cli-table3 pads to table-wide max, not per-row max.)
+
+### CLI Design Principles
+See `$mdr:dev-core` § "CLI Development" for general principles (centralized parsing, `--json` support, consistent flags).
+
+**Prefer library over CLI for TypeScript-to-TypeScript calls.** When a TypeScript project provides both a library API and a CLI, prefer importing the library directly over spawning the CLI:
+
+`````typescript!
+// ❌ Avoid - shelling out to CLI from TypeScript
+import { execSync } from 'child_process';
+execSync('tg send --project mdr "Hello"');
+
+// ✅ Prefer - direct library import
+import { send, getChatIdForProject } from '@mdr/chat-telegram';
+await send({ from: 'my-project', channel: String(getChatIdForProject('mdr')), text: 'Hello' });
+`````
+
+**Why:** Avoids PATH issues, type-safe, no subprocess overhead, no string escaping.
+
+**Bun TTY input after readline is unreliable on macOS.** After a readline interface opens, Bun may not deliver later stdin `data` events reliably, even through a fresh `tty.ReadStream(0)`. For "accept input while loading" UX, prefer explicit flags, startup pre-buffer detection before opening readline, or subprocess-owned TTY reads.
+
+### Code Style: Single-Line Preference
+**Prefer single-line when it fits (<100 chars):** imports (<6 items), objects (<4 props), function signatures, guard clauses (braceless `if (err) return`), simple if (no else).
+
+**if/else pairs:** Always multi-line with braces on both branches.
+**if/else if chains:** Use for mutually exclusive conditions on same variable, even with early returns.
+
+`````typescript!
+// Guard clauses: braceless OK
+if (err) return reject(new Error('Timeout'));              // ✅
+
+// if/else: multi-line, braces on both
+if (x) {                                                   // ✅
+  doA();
+} else {
+  doB();
+}
+
+// Object passing: don't destructure + reconstruct
+return obj;                                                // ✅ (not { a: obj.a, b: obj.b })
+`````
+
+**Multi-line OK:** complex nested objects, configs with many properties.
+**Keep var/function separate when:** used multiple times, name adds semantic clarity, or logic is >5 lines.
+**Single-use private methods:** inline into caller. **Duplicated code (>3 lines):** extract `_helper()`.
+**Detached promises:** Intentionally detached promises must attach an explicit owner `.catch()` at the detach site; changing the caller to `await` changes latency and failure semantics.
+**Comments for non-obvious returns:** `return { type: 'noop' }; // Our own write`
+**JSDoc:** Add `@example` for complex object parameters (WebSocket messages, API shapes).
+
+### Synchronous Sleep: Use `Atomics.wait`; Banned: `execSync('sleep')`, `Bun.sleepSync`
+In async functions, use `await new Promise(r => setTimeout(r, delayMs))`. In sync contexts where `await` is unavailable, use `Atomics.wait`. Banned sleep forms are lint-checked by `local/no-banned-sleep`.
+
+### `bun:sqlite` in Daemons: Yield Between Batches; Banned: Unbounded Sync Loops
+`bun:sqlite` sync API is faster than async for typical queries (no thread-pool hop, no Promise overhead). But in long-running daemons with timers (`setInterval`, health writers), a tight loop of sync queries (batch INSERTs, FTS rebuilds) blocks the event loop and starves timer callbacks. Yield with `await new Promise(r => setTimeout(r, 0))` between batches or sources.
+
+### Timeouts: Use `execWithLog` for `execFileSync`; Log Before Throwing
+Timeout-killed paths must log `{ cmd / what-we-were-waiting-for, elapsedMs, budgetMs }` before rethrowing. Prefer `execWithLog` from `@mdr/lib-utils/helpers` for `execFileSync`; bare `execFileSync`/`execSync` calls with `timeout:` are lint-checked by `local/require-exec-with-log` (warn) unless a surrounding catch references `ETIMEDOUT`.
+
+### `tt` Watchers: Follow `$dev-core` and Use `@mdr/lib-watch`
+For TypeScript code inside the `tt` monorepo, follow `$dev-core`'s file-watching rule: use `@mdr/lib-watch` instead of open-coded `fs.watch` / `fs.watchFile` loops.
+
+## 2. Testing & Verification
+See `$mdr:dev-core` § "Testing" for directory structure, fixtures, and banned patterns.
+
+TypeScript/Vitest test-quality lint and audit items live in `$lint-ts-tests`: live filesystem scans, unit wrapper subprocesses, heavy eager test-hub imports, fixture boundaries, and test child-process timeouts.
+
+### Test Organization (TypeScript-Specific)
+When a project has a `_TEST.md` spec file:
+- **Test file naming**: Use prefix matching _TEST.md sections (e.g., `A.operations.test.ts` → Section A)
+- **Test names**: Include spec ID directly in `it()`: `it('A.1: AddTaskOp (With Index)', () => {`
+
+### Global Setup for Vitest
+See `$lint-ts-tests` § "Vitest Setup Teardown: Return a Teardown Fn; Call `await shutdown()` When Using lib-log".
+
+### Exercising `bun:ffi`/`bun:sqlite` from Vitest Tests
+See `$lint-ts-tests` § "Bun FFI/SQLite from Vitest: Shell Out to `bun -e`; Banned: Weakening Production Bun Imports". One TypeScript-only note: Bun-native tests should import from `bun:test` when not using Vitest globals; synthetic global references break typecheck when the installed type package lacks that subpath.
+
+### CLI Wrapper Smoke Test: Lives in `test/e2e/**`, Banned in `test/unit/**`
+Every TypeScript port that ships a `scripts/X` bash wrapper MUST include at least one Vitest test that invokes the shipped wrapper end-to-end. That smoke — and every other first-party wrapper spawn — lives in `test/e2e/**`, reachable through a `test:e2e` package script. Create a `test:e2e` lane if the skill lacks one.
+
+`test/unit/**` spawns ZERO first-party shipped wrappers (`scripts/X`, `rp`, `prc`, `ccsync`). There is no smoke-file exemption and no `audit-boundary:` escape hatch in unit. Behavior coverage (parser, help-text, command logic) uses in-process dispatch or library tests (`_main`, `runCli`, parser helpers). Process-contract spawns (exit-code tiers, stderr stack-trace cleanliness, stdout, color, agent-context refusal, process isolation) also live in `test/e2e/**`. Python, external, and other non-first-party commands stay unflagged anywhere.
+
+The smoke uses `execFileSync('<scriptname>', ['--help'])` or another non-destructive flag, then matches output with a regex or `expect(...).toContain(...)`. This catches failures that `src/lib` unit tests miss: missing `bun install`, broken `install-on-missing-deps`, Bun shebang resolution, and module-load errors. Prefer non-destructive getters (`X --help`, `X list`, `X status`) over setters — smoke tests run repeatedly, so a mutating smoke is a footgun.
+
+This is enforced by `$lint-ts-tests` `no-unit-wrapper-spawn` (error on any first-party wrapper spawn under `test/unit/**`).
+
+`````typescript!
+import { execFileSync } from 'node:child_process';
+
+// test/e2e/wrapper-smoke.test.ts
+it('smokes the shipped wrapper', () => {
+  const output = execFileSync('scripts/X', ['--help'], { encoding: 'utf8', timeout: 10000 });
+  expect(output).toContain('Usage:');
+});
+`````
+
+Run through the package test script when one exists; otherwise use `./node_modules/.bin/vitest`, never bare `vitest`.
+
+### Child Processes in Tests MUST Pass `timeout`; Banned: Untimed `spawnSync`/`execSync`/`execFileSync`/`Bun.spawnSync`
+Every synchronous child-process call in tests — `spawnSync()`, `execSync()`, `execFileSync()`, and `Bun.spawnSync()` — MUST pass an explicit `timeout` (10000-30000ms; ~2x the slowest observed run) so a hung child fails at the call site instead of blocking the JS thread until the outer `dt`/Vitest budget kills the suite. Applies to wrapper smoke tests, dynamic CLI-dispatch tests, e2e CLI helpers, and `bun -e` contract shells; shared `_run()`-style helpers set the timeout once for every caller.
+
+Audit ownership for this test-specific timeout rule lives in `$lint-ts-tests/audit/checklist.md`.
+
+### `critGuardCli` Structured-Exit Tests: Clean Up Process-Level State
+See `$lint-ts-tests` § "`critGuardCli` Structured-Exit Tests: Restore Process-Level State in `afterEach`".
+
+### Local Rule Package Smoke Test: Use Real `eslint --config`
+See `$lint-ts-tests` § "Local Rule Package Smoke: Run the Built Plugin Through Real `eslint --config`".
+
+### Definition of Done: Work Is NOT Done Until `bun run test` Has Been Run
+For TypeScript projects with a `test` script, work is not done until `bun run test` has been run in the current worktree after the final code changes.
+
+Test-script names follow `$dev-test` "Test Script Naming Standard".
+
+`bun run lint`, `bun run typecheck`, and focused Vitest commands are useful while iterating, but they are not sufficient to claim completion. They are debugging steps, not the final verification gate.
+
+Remember that `bun run test` is the repo's default lane, not automatically the full suite. If the named gate for the task is `test:e2e`, `test:all`, or another explicit lane, run that exact lane in addition to the default entrypoint.
+
+Only skip `bun run test` when the project truly does not provide it or it cannot run in the current environment, and in that case explicitly say so in the final report.
+
+### Verification
+After setup, verify:
+1. Symlinked script works: `which book` → `~/mnt/.bin/book`
+2. Final gate: `bun run test`
+3. Optional drill-down after failures: `bun run typecheck`, focused Vitest commands, or individual repro commands
+4. For changed package exports, a real consumer resolves the installed export path.
+5. For dependency additions, removals, or swaps: run the package install path and inspect the package manifest plus lockfile delta so stale `node_modules` cannot hide a missing or lingering dependency.
+
+**Banned:** bare `vitest` in shell commands. Use package scripts (or `./node_modules/.bin/vitest` if no package script).
+
+## 3. Shell Conventions
+See `$mdr:dev-bash` for bash wrapper script and sourceable library conventions: shebang policy, ESTALE retry, `lib-log` bash emitter routing, `ccsync warm`, broken `link:` repair, bash-builtin-vs-shell-out tradeoff, and the `install-on-missing-deps` tier-timing reference profile.
 
 
 

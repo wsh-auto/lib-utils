@@ -150,7 +150,7 @@ Correct shape:
 log.debug('thing happened', { field1, field2 });
 `````
 
-The shared `install-on-missing-deps` wrapper (`$dev-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `LOG_LEVEL=debug` via `overmind.env`. All levels still ship to Axiom.
+The shared `install-on-missing-deps` wrapper (`$lint-typescript`) sets `LOG_LEVEL=info` for all CLIs automatically. Daemons managed by `pmm` get `LOG_LEVEL=debug` via `overmind.env`. All levels still ship to Axiom.
 
 ### Browser - createLogger(project-name)
 For frontend/browser environments (e.g., React apps bundled with Vite):

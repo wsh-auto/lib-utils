@@ -1,1 +1,1 @@
-../dev-typescript/assets/templates/eslint.config.js
+../lint-typescript/assets/templates/eslint.config.js

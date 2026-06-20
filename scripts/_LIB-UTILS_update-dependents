@@ -6,9 +6,6 @@ set -euo pipefail
 
 LIBLOG_ORIGINAL_ARGS=("$@")
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd -P)"
-
 CYAN=$'\x1b[1m\x1b[36m'
 YELLOW=$'\x1b[33m'
 GREEN=$'\x1b[32m'
@@ -105,10 +102,11 @@ if $JSON; then
   command -v jq >/dev/null 2>&1 || usage_error "Required tool not in PATH for --json: jq"
 fi
 
-LIBLOG_PROJECT="mdr:lib-utils:update-dependents"
+export LIBLOG_PROJECT="mdr:lib-utils:update-dependents"
 _liblog="$HOME/mnt/mdr/skills/lib-log/src/bash/liblog"
 LIBLOG_SOURCED=false
 if [[ -r $_liblog ]]; then
+  # shellcheck source=/Users/eshao/mnt/mdr/skills/lib-log/src/bash/liblog
   source "$_liblog"
   if ((${#LIBLOG_ORIGINAL_ARGS[@]})); then liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"
   else liblog_cli_invoked
@@ -438,4 +436,7 @@ else
   echo
   echo "${CYAN}Done:${NC} ${GREEN}${SUCCESS} updated${NC}$( [[ $FAIL -gt 0 ]] && echo ", ${RED}${FAIL} failed${NC}" )"
 fi
-exit $([[ $FAIL -gt 0 ]] && echo 5 || echo 0)
+if [[ $FAIL -gt 0 ]]; then
+  exit 5
+fi
+exit 0
