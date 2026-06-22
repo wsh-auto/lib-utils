@@ -282,7 +282,7 @@ Before editing, understand the skill's current structure:
 4. Review recent changes (if available) to understand evolution
 
 ### 2. Making Effective Edits
-For documentation style rules (DRY, structure, succinctness), see `$lib-markdown/references/`.
+For documentation style rules (DRY, structure, succinctness), see `$lint-markdown/references/`.
 
 **What does NOT belong in SKILL.md:**
 - Complete implementation examples (>20 lines of code)
@@ -722,7 +722,7 @@ Standalone bash CLIs snapshot `LIBLOG_ORIGINAL_ARGS=("$@")` before parsing, then
 - Sourceable wrappers call `liblog_emit <level> <message> [argv...]` for detached non-lifecycle events.
 - Delivery writes to the durable local spool consumed by `logshipd`; bash no longer needs `AXIOM_TOKEN`.
 - Bash wrappers that immediately `exec` into TypeScript/Python inherit coverage from the wrapped entrypoint.
-- See `$dev-bash` for bash entrypoint, strict-shell, and `liblog_crit_guard` placement rules.
+- See `$lint-bash` for bash entrypoint, strict-shell, and `liblog_crit_guard` placement rules.
 
 ## Delivery
 TypeScript, Python, and bash write canonical 10-column JSONL rows under `~/.local/state/lib-log/delivery/<YYYY-MM-DD>/`; `$mdr:srv-vector` owns the `logshipd` pmm service that runs Vector, ships those rows to Axiom, writes health, and performs checkpoint-aware reaping. lib-log owns row format, oversize compaction, flush/fsync, and `getSpoolBackpressureStatus()`.
@@ -963,7 +963,7 @@ Project-aware log viewer. Auto-detects project from cwd. Supports APL passthroug
 
 `````bash!
 ax                                  # Recent logs for current project (catches subsystems)
-ax projects                         # List all project names
+ax projects                         # Projects with row counts per dataset (all datasets, last 24h)
 ax crit                             # Critical incidents across all projects/hosts (configured default window)
 ax crit show 260512_043015_123_abcdef
 ax crit close 260512_043015_123_abcdef --outcome FIXED --lesson "Fixed parser invariant"
@@ -1432,7 +1432,7 @@ Standalone bash CLIs snapshot `LIBLOG_ORIGINAL_ARGS=("$@")` before argument pars
 - `liblog_cli_invoked` emits `cli boot` and installs an EXIT trap that emits `cli exit` with `wallMs` and `exitCode`.
 - `src/bash/liblog` is fail-soft and uses the same durable spool as TypeScript/Python via detached `printf >>` O_APPEND writes with a PIPE_BUF-sized 4096B row cap.
 - `LIBLOG_SPOOL_ROOT` can override the spool root for tests, and Axiom visibility normally lags by 1-10s while `logshipd` ships the row.
-- See `$dev-bash` for bash entrypoint, strict-shell, and `liblog_crit_guard` placement rules.
+- See `$lint-bash` for bash entrypoint, strict-shell, and `liblog_crit_guard` placement rules.
 
 Sourceable bash wrappers may call `liblog_emit <level> <message> [argv...]` for non-lifecycle events. It is a fail-soft detached spool emitter; use standard levels `debug`, `info`, `warn`, `error`, and `critical`.
 
@@ -1579,9 +1579,6 @@ set -euo pipefail
 
 LIBLOG_ORIGINAL_ARGS=("$@")
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd -P)"
-
 CYAN=$'\x1b[1m\x1b[36m'
 YELLOW=$'\x1b[33m'
 GREEN=$'\x1b[32m'
@@ -1678,10 +1675,11 @@ if $JSON; then
   command -v jq >/dev/null 2>&1 || usage_error "Required tool not in PATH for --json: jq"
 fi
 
-LIBLOG_PROJECT="mdr:lib-utils:update-dependents"
+export LIBLOG_PROJECT="mdr:lib-utils:update-dependents"
 _liblog="$HOME/mnt/mdr/skills/lib-log/src/bash/liblog"
 LIBLOG_SOURCED=false
 if [[ -r $_liblog ]]; then
+  # shellcheck source=/Users/eshao/mnt/mdr/skills/lib-log/src/bash/liblog
   source "$_liblog"
   if ((${#LIBLOG_ORIGINAL_ARGS[@]})); then liblog_cli_invoked "${LIBLOG_ORIGINAL_ARGS[@]}"
   else liblog_cli_invoked
@@ -2011,7 +2009,10 @@ else
   echo
   echo "${CYAN}Done:${NC} ${GREEN}${SUCCESS} updated${NC}$( [[ $FAIL -gt 0 ]] && echo ", ${RED}${FAIL} failed${NC}" )"
 fi
-exit $([[ $FAIL -gt 0 ]] && echo 5 || echo 0)
+if [[ $FAIL -gt 0 ]]; then
+  exit 5
+fi
+exit 0
 
 ================
 File: lib-utils/src/env.ts
@@ -2253,20 +2254,20 @@ requiredFiles:
 
 # lib-utils (49.2k)
 ## Documentation (8.2k)
-- [@SKILL.md (5k)](https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g)
+- @SKILL.md (5k)
 - @CONTRIBUTING.md (600)
 - @package.json (500)
 - @anima/memory/DREAM.md (1.5k)
 - @anima/memory/PENDING.md (600)
 
-## Code (6k)
+## Code (5.9k)
 - @scripts/_LIB-UTILS_update-dependents (3.6k)
 - @src/env.ts (800)
 - @src/logger.ts (1.5k)
 
 ## requiredSkills (35k)
 - [@../lint-typescript/SKILL.md (8k)](https://hackmd.io/b6Gk5_TVRU2ggO4RHgVUSQ)
-  - [@SKILL.md (5k)](https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g)
+  - @SKILL.md (5k)
 - [@../lib-1password/SKILL.md (3k)](https://hackmd.io/p4SYLbb2Q46I-ajQH8jeyg)
 - [@../lib-log/SKILL.md (11k)](https://hackmd.io/NW6P7MmBT96KIwz_njPGNg)
   - [@../lib-log/README.md (2k)](https://hackmd.io/98bb5aKLTJaVKrvs9IpMlg)
@@ -2384,7 +2385,7 @@ File: lib-utils/package.json
     "lint": "eslint '{src,test}/**/*.ts'",
     "lint:fix": "eslint '{src,test}/**/*.ts' --fix",
     "test": "bun run lint && bun run typecheck && bun run test:unit",
-    "test:unit": "dt wrap -- timeout --foreground 300 ./node_modules/.bin/vitest run test/unit --passWithNoTests",
+    "test:unit": "dt wrap -- bash -c 'timeout --foreground 300 ./node_modules/.bin/vitest run test/unit --passWithNoTests && timeout --foreground 300 bats test/unit'",
     "test:e2e": "dt wrap -- timeout --foreground 300 ./node_modules/.bin/vitest run test/e2e",
     "with-lock:install": "with-lock --project-root . -- bun install",
     "preinstall": "with-lock preinstall-guard"
@@ -2408,7 +2409,7 @@ File: lib-utils/SKILL.md
 name: lib-utils
 description: >-
   This skill should be used when projects need CI-safe utilities that work in both dev and CI without special setup. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Keywords: "@mdr/lib-utils", "_LIB-UTILS_update-dependents", "bunWrite", "runLogged", "execWithLog", "critical-guard", "Axiom", "1Password"
-hackmd: https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g
+hackmd: https://hackmd.io/hTqil1prT3KbxACWhKlXuQ
 ---
 
 # lib-utils
@@ -2579,7 +2580,7 @@ log.info('Page loaded');
 
 `````bash!
 ax                          # Logs for current folder (auto-detects)
-ax projects                 # List all project names
+ax projects                 # Projects with row counts per dataset
 ax --project '*cli-tt*'     # All cli-tt subsystems (glob pattern)
 ax --level error            # Filter by level
 ax --json                   # JSON output for agents
@@ -2736,6 +2737,7 @@ Default runtime is Bun direct-from-`src/`. Exception: packages exporting symbols
     - `bun:sqlite` in Daemons: Yield Between Batches; Banned: Unbounded Sync Loops
     - Timeouts: Use `execWithLog` for `execFileSync`; Log Before Throwing
     - `tt` Watchers: Follow `$dev-core` and Use `@mdr/lib-watch`
+    - Search/Log Attribution: When a Project Should Adopt `from`
 - 2\. Testing & Verification
     - Test Organization (TypeScript-Specific)
     - Global Setup for Vitest
@@ -2913,7 +2915,7 @@ Local lint rules enforce the automatable TypeScript policy surface:
 | `local/no-fractional-ms-storage` | `$mdr:dev-core` § "Time Variables" integer `*Ms` storage |
 
 ### Markdown Writes: Apply `fixMarkdown()` Before Writing; Banned: Raw `.md` Write Calls
-Markdown writes from TypeScript must apply `fixMarkdown()` before writing. Literal `.md` write calls are lint-checked by `local/no-bunwrite-md-without-fix`; see `$lib-markdown` § "Banned" for the canonical policy.
+Markdown writes from TypeScript must apply `fixMarkdown()` before writing. Literal `.md` write calls are lint-checked by `local/no-bunwrite-md-without-fix`; see `$lint-markdown` § "Banned" for the canonical policy.
 
 ### Banned: Bare `catch {}`; Catch Blocks Must Handle or Propagate
 Every `catch` block must rethrow, log via lib-log, or handle a named expected condition. Empty catches are lint-checked by `local/no-bare-catch`. Comment-only catches are allowed only when the comment names the expected condition, such as `ENOENT` or `client disconnected`.
@@ -3039,8 +3041,20 @@ Timeout-killed paths must log `{ cmd / what-we-were-waiting-for, elapsedMs, budg
 ### `tt` Watchers: Follow `$dev-core` and Use `@mdr/lib-watch`
 For TypeScript code inside the `tt` monorepo, follow `$dev-core`'s file-watching rule: use `@mdr/lib-watch` instead of open-coded `fs.watch` / `fs.watchFile` loops.
 
+### Search/Log Attribution: When a Project Should Adopt `from`
+lib-log auto-resolves identity at the **process boundary** — `caller` (actor) and `binary` come from env, argv, and TTY. That fully attributes a search or log only while one process means one operation: a thin CLI's binary name *is* the operation, so auto-detection is enough.
+
+A project needs an explicit `from` call-site tag once identity is **decoupled from the entrypoint**, so process-level fields collapse many distinct operations into one. That happens when code:
+- runs in a **shared library** that many entrypoints call — `caller`/`binary` are identical across every call site, so a search or log cannot say which consumer triggered it;
+- runs in a **long-lived daemon or automation** process serving many operations over its lifetime — one process identity spans them all;
+- runs **detached from a TTY/human**, with no interactive actor to attribute to.
+
+In each case the unit you must name to debug a guard-blocked or runaway search is finer than the process, and `from` re-supplies the call-site identity that auto-detection cannot. A thin leaf CLI does not need it — its binary already names the operation.
+
+How to implement it — `from` format, uniqueness, required type, reserved-keyword collision, the never-hand-set-`caller` rule, and `$lib-findgrep` lint enforcement — lives in `references/from-attribution.md`.
+
 ## 2. Testing & Verification
-See `$mdr:dev-core` § "Testing" for directory structure, fixtures, and banned patterns.
+See `$mdr:dev-core` § "Testing" for directory structure, fixtures, and banned patterns. TypeScript follows the shared `test/{unit,e2e}/` skeleton with Vitest `*.test.ts` files and `test/fixtures/` plus lane-local `tmp/` scratch.
 
 TypeScript/Vitest test-quality lint and audit items live in `$lint-ts-tests`: live filesystem scans, unit wrapper subprocesses, heavy eager test-hub imports, fixture boundaries, and test child-process timeouts.
 
@@ -3109,7 +3123,7 @@ After setup, verify:
 **Banned:** bare `vitest` in shell commands. Use package scripts (or `./node_modules/.bin/vitest` if no package script).
 
 ## 3. Shell Conventions
-See `$mdr:dev-bash` for bash wrapper script and sourceable library conventions: shebang policy, ESTALE retry, `lib-log` bash emitter routing, `ccsync warm`, broken `link:` repair, bash-builtin-vs-shell-out tradeoff, and the `install-on-missing-deps` tier-timing reference profile.
+See `$mdr:lint-bash` for bash wrapper script and sourceable library conventions: shebang policy, ESTALE retry, `lib-log` bash emitter routing, `ccsync warm`, broken `link:` repair, bash-builtin-vs-shell-out tradeoff, and the `install-on-missing-deps` tier-timing reference profile.
 
 
 

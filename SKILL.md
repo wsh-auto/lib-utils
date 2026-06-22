@@ -2,7 +2,7 @@
 name: lib-utils
 description: >-
   This skill should be used when projects need CI-safe utilities that work in both dev and CI without special setup. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Keywords: "@mdr/lib-utils", "_LIB-UTILS_update-dependents", "bunWrite", "runLogged", "execWithLog", "critical-guard", "Axiom", "1Password"
-hackmd: https://hackmd.io/ciyFUK5VQTG6rz5upNbX0g
+hackmd: https://hackmd.io/hTqil1prT3KbxACWhKlXuQ
 ---
 
 # lib-utils
@@ -173,7 +173,7 @@ log.info('Page loaded');
 
 `````bash!
 ax                          # Logs for current folder (auto-detects)
-ax projects                 # List all project names
+ax projects                 # Projects with row counts per dataset
 ax --project '*cli-tt*'     # All cli-tt subsystems (glob pattern)
 ax --level error            # Filter by level
 ax --json                   # JSON output for agents
