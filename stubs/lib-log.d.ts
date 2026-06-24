@@ -4,6 +4,7 @@
  */
 declare module '@mdr/lib-log' {
   interface Logger {
+    readonly name: string;
     critical(message: string, fields?: Record<string, unknown>): void;
     debug(message: string, fields?: Record<string, unknown>): void;
     info(message: string, fields?: Record<string, unknown>): void;

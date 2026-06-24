@@ -21,6 +21,7 @@ export interface LoggerOptions {
 
 /** Logger contract exposed by lib-log and the CI stub. */
 interface Logger {
+  readonly name: string;
   critical(message: string, fields?: Record<string, unknown>): void;
   debug(message: string, fields?: Record<string, unknown>): void;
   info(message: string, fields?: Record<string, unknown>): void;
@@ -34,6 +35,8 @@ interface Logger {
 
 /** Type matching lib-log's createLogger signature. */
 type CreateLoggerFn = (name: string, options?: LoggerOptions) => Logger;
+type LibLogModule = { createLogger: CreateLoggerFn; shutdown?: () => Promise<void> };
+type LogMethod = 'critical' | 'debug' | 'info' | 'warn' | 'error' | 'telemetry' | 'trace';
 
 /** Create a console-based stub logger for CI environments */
 function _createStubLogger(name: string, parentFields: Record<string, unknown> = {}): Logger {
@@ -45,6 +48,7 @@ function _createStubLogger(name: string, parentFields: Record<string, unknown> =
   };
 
   return {
+    name,
     critical: (msg, fields) => console.error(_format('critical', msg, fields)),
     debug: (msg, fields) => console.log(_format('debug', msg, fields)),
     info: (msg, fields) => console.log(_format('info', msg, fields)),
@@ -57,35 +61,80 @@ function _createStubLogger(name: string, parentFields: Record<string, unknown> =
   };
 }
 
-// Try to load lib-log at module init. Will be either:
-// - The real lib-log module (normal case)
-// - A stub creator function (CI case)
-// - Never assigned (non-CI failure → process.exit before reaching here)
-let libLog: { createLogger: CreateLoggerFn; shutdown?: () => Promise<void> };
-try {
-  libLog = await import('@mdr/lib-log');
-} catch (err) {
-  // Only treat as "lib-log missing" when the error clearly identifies
-  // @mdr/lib-log itself as the missing target. Transitive-dep failures
-  // inside lib-log (e.g. a missing peer of lib-log) re-throw so the
-  // real root cause is visible instead of the misleading FATAL below.
-  if (!isOptionalDepMissing(err, '@mdr/lib-log')) throw err;
-  const caller = process.argv[1] || 'unknown';
-  if (process.env.CI) {
-    // CI: lib-log not needed, use console-based stub
-    console.log(`[lib-utils] lib-log not available, using stub (caller: ${caller})`);
-    libLog = { createLogger: (name: string) => _createStubLogger(name) };
-  } else {
-    // Development: lib-log is required, fail loudly
-    console.error(
-      `[lib-utils] FATAL: lib-log not available.\n` +
-        `Add to optionalDependencies:\n` +
-        `  "@mdr/lib-log": "link:@mdr/lib-log"\n` +
-        `Then run: bun link @mdr/lib-log && bun install\n` +
-        `(caller: ${caller})`
-    );
-    process.exit(1);
+let libLog: LibLogModule | undefined;
+let libLogPromise: Promise<LibLogModule> | undefined;
+const pendingLoggerPromises = new Set<Promise<Logger>>();
+
+function _loadLibLog(): Promise<LibLogModule> {
+  if (libLog) return Promise.resolve(libLog);
+  if (!libLogPromise) {
+    libLogPromise = import('@mdr/lib-log')
+      .then(mod => {
+        libLog = mod;
+        return mod;
+      })
+      .catch(err => {
+        // Only treat as "lib-log missing" when the error clearly identifies
+        // @mdr/lib-log itself as the missing target. Transitive-dep failures
+        // inside lib-log (e.g. a missing peer of lib-log) re-throw so the
+        // real root cause is visible instead of the misleading FATAL below.
+        if (!isOptionalDepMissing(err, '@mdr/lib-log')) throw err;
+        const caller = process.argv[1] || 'unknown';
+        if (process.env.CI) {
+          // CI: lib-log not needed, use console-based stub
+          console.log(`[lib-utils] lib-log not available, using stub (caller: ${caller})`);
+          libLog = { createLogger: (name: string) => _createStubLogger(name) };
+          return libLog;
+        }
+        // Development: lib-log is required, fail loudly
+        console.error(
+          `[lib-utils] FATAL: lib-log not available.\n` +
+            `Add to optionalDependencies:\n` +
+            `  "@mdr/lib-log": "link:@mdr/lib-log"\n` +
+            `Then run: bun link @mdr/lib-log && bun install\n` +
+            `(caller: ${caller})`
+        );
+        process.exit(1);
+      });
   }
+  return libLogPromise;
+}
+
+function _createDeferredLogger(name: string, ready: Promise<Logger>): Logger {
+  let realLogger: Logger | undefined;
+  const pendingCalls: Array<(logger: Logger) => void> = [];
+  const trackedReady = ready
+    .then(logger => {
+      realLogger = logger;
+      for (const call of pendingCalls.splice(0)) call(logger);
+      return logger;
+    })
+    .finally(() => pendingLoggerPromises.delete(trackedReady));
+  pendingLoggerPromises.add(trackedReady);
+
+  const _call = (method: LogMethod, message: string, fields?: Record<string, unknown>) => {
+    if (realLogger) {
+      realLogger[method](message, fields);
+    } else {
+      pendingCalls.push(logger => logger[method](message, fields));
+    }
+  };
+
+  return {
+    name,
+    critical: (message, fields) => _call('critical', message, fields),
+    debug: (message, fields) => _call('debug', message, fields),
+    info: (message, fields) => _call('info', message, fields),
+    warn: (message, fields) => _call('warn', message, fields),
+    error: (message, fields) => _call('error', message, fields),
+    telemetry: (message, fields) => _call('telemetry', message, fields),
+    trace: (message, fields) => _call('trace', message, fields),
+    child: fields => _createDeferredLogger(name, trackedReady.then(logger => logger.child?.(fields) ?? logger)),
+    flush: async () => {
+      const logger = await trackedReady;
+      await logger.flush();
+    },
+  };
 }
 
 /**
@@ -97,7 +146,8 @@ try {
  * @returns Logger instance with critical/debug/info/warn/error/telemetry/trace/child/flush methods
  */
 export function createLogger(name: string, options?: LoggerOptions): Logger {
-  return libLog.createLogger(name, options);
+  if (libLog) return libLog.createLogger(name, options);
+  return _createDeferredLogger(name, _loadLibLog().then(mod => mod.createLogger(name, options)));
 }
 
 /**
@@ -120,7 +170,13 @@ export function createLogger(name: string, options?: LoggerOptions): Logger {
  * @returns Resolves after available logger and stdout drains complete.
  */
 export async function shutdown(): Promise<void> {
-  if (libLog.shutdown) {
+  if (libLogPromise) {
+    await libLogPromise;
+  }
+  if (pendingLoggerPromises.size > 0) {
+    await Promise.all([...pendingLoggerPromises]);
+  }
+  if (libLog?.shutdown) {
     await libLog.shutdown();
   }
   if (!process.stdout.destroyed && !process.stdout.writableEnded) {

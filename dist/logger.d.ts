@@ -19,6 +19,7 @@ export interface LoggerOptions {
 }
 /** Logger contract exposed by lib-log and the CI stub. */
 interface Logger {
+    readonly name: string;
     critical(message: string, fields?: Record<string, unknown>): void;
     debug(message: string, fields?: Record<string, unknown>): void;
     info(message: string, fields?: Record<string, unknown>): void;

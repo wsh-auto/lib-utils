@@ -1,7 +1,7 @@
 ---
 name: lib-utils
 description: >-
-  This skill should be used when projects need CI-safe utilities that work in both dev and CI without special setup. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Keywords: "@mdr/lib-utils", "_LIB-UTILS_update-dependents", "bunWrite", "runLogged", "execWithLog", "critical-guard", "Axiom", "1Password"
+  This skill should be used when projects need CI-safe utilities that work in both dev and CI without special setup. Provides logger wrapper (falls back to stub when lib-log unavailable) and lib-1password env injection (skips in CI). Keywords: "@mdr/lib-utils", "bunWrite", "runLogged", "execWithLog", "critical-guard", "Axiom", "1Password"
 hackmd: https://hackmd.io/hTqil1prT3KbxACWhKlXuQ
 ---
 
@@ -32,19 +32,18 @@ Utilities that enhance development but gracefully degrade in CI environments.
 - Helpers / agentSandboxDir()
 - Helpers / Critical-Guard()
 - lib-1password / env.ts - initEnv(callerDir, skipIfEnvVars?, Log?)
-- Scripts
 
 ## Installation
 
 `````bash!
-bun add github:wsh-auto/lib-utils
+bun add link:@mdr/lib-utils
 `````
 
 **Consumer `package.json` (only include optionalDeps you use):**
 
 `````json!
 "dependencies": {
-  "@mdr/lib-utils": "github:wsh-auto/lib-utils"
+  "@mdr/lib-utils": "link:@mdr/lib-utils"
 },
 "optionalDependencies": {
   "@mdr/lib-log": "link:@mdr/lib-log"
@@ -52,7 +51,7 @@ bun add github:wsh-auto/lib-utils
 `````
 
 - **Separate exports**: Import from `/logger` or `/env` - each loads only its optional dep
-- **lib-utils**: always `github:` in dependencies
+- **lib-utils**: always `link:` in dependencies
 - **lib-log/lib-1password**: always `link:` in **optionalDependencies** - only include what you use
 - **Consumer boundary**: Consumer packages import helpers through `@mdr/lib-utils` (`@mdr/lib-utils/helpers`, `@mdr/lib-utils/helpers/critical-guard`, etc.). `@mdr/lib-helpers` owns pure implementations behind the wrapper; do not import it directly from normal consumers.
 - **CI**: graceful degradation (console stub / no-op)
@@ -282,6 +281,3 @@ initEnv(import.meta.dirname, [], customLogger);           // custom logger (must
 - If `@mdr/lib-1password` installed: delegates to lib1p.initEnv() (1Password injection)
 - If not + CI: returns `{ parsed: {} }` (empty stub)
 - If not + not CI: exit(1) with instructions to add to optionalDependencies
-
-## Scripts
-`scripts/_LIB-UTILS_update-dependents` - Updates all lib-utils dependents. Run with `--help` for usage.

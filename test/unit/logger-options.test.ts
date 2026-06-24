@@ -9,4 +9,9 @@ describe('logger option type surface', () => {
     expect(options.caller).toBe('automation');
     expect(typeof log.info).toBe('function');
   });
+
+  it('preserves the logger name for daemon guard consumers', () => {
+    const log = createLogger('mdr:lib-utils:daemon', { axiom: { enabled: false } });
+    expect(log.name).toBe('mdr:lib-utils:daemon');
+  });
 });

@@ -5,12 +5,11 @@ requiredSkills:
   - mdr:lib-log
   - mdr:edit-skill
 requiredFiles:
-  - scripts/_LIB-UTILS_update-dependents
   - src/env.ts
   - src/logger.ts
 ---
 
-# lib-utils (49.2k)
+# lib-utils (42.5k)
 ## Documentation (8.2k)
 - @SKILL.md (5k)
 - @CONTRIBUTING.md (600)
@@ -18,15 +17,14 @@ requiredFiles:
 - @anima/memory/DREAM.md (1.5k)
 - @anima/memory/PENDING.md (600)
 
-## Code (5.9k)
-- @scripts/_LIB-UTILS_update-dependents (3.6k)
+## Code (2.3k)
 - @src/env.ts (800)
 - @src/logger.ts (1.5k)
 
-## requiredSkills (35k)
-- [@../lint-typescript/SKILL.md (8k)](https://hackmd.io/b6Gk5_TVRU2ggO4RHgVUSQ)
+## requiredSkills (32k)
+- [@../lint-typescript/SKILL.md (9k)](https://hackmd.io/b6Gk5_TVRU2ggO4RHgVUSQ)
   - @SKILL.md (5k)
 - [@../lib-1password/SKILL.md (3k)](https://hackmd.io/p4SYLbb2Q46I-ajQH8jeyg)
-- [@../lib-log/SKILL.md (11k)](https://hackmd.io/NW6P7MmBT96KIwz_njPGNg)
+- [@../lib-log/SKILL.md (12k)](https://hackmd.io/NW6P7MmBT96KIwz_njPGNg)
   - [@../lib-log/README.md (2k)](https://hackmd.io/98bb5aKLTJaVKrvs9IpMlg)
-- [@../edit-skill/SKILL.md (6k)](https://hackmd.io/KP6XTElkQXuNXale7a0AOQ)
+- [@../edit-skill/SKILL.md (6k)](https://hackmd.io/Y6spZh1MSuGq03Qw7RczFA)

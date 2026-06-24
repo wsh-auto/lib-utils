@@ -3,7 +3,9 @@
   "compilerOptions": {
     "declaration": false,
     "emitDeclarationOnly": false,
-    "noEmit": true
+    "noEmit": true,
+    "rootDir": "."
   },
-  "include": ["src/**/*", "test/**/*"]
+  "include": ["src/**/*", "test/**/*"],
+  "exclude": ["node_modules"]
 }

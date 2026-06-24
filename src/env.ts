@@ -9,6 +9,7 @@
  */
 
 import type { DotenvConfigOutput } from 'dotenv';
+import { createRequire } from 'node:module';
 import { isOptionalDepMissing } from './optional-dep.js';
 
 /** Logger interface for lib-1password secret-loading failures. */
@@ -21,25 +22,27 @@ interface Log {
 /** Type matching lib-1password's initEnv signature. */
 type InitEnvFn = (callerDir: string, skip: string[], log: Log) => DotenvConfigOutput;
 
-// Try to load lib-1password at module init. Will be either:
-// - The real lib-1password module (normal case)
-// - A stub that returns empty parsed object (CI case)
-// - Never assigned (non-CI failure → process.exit before reaching here)
-let lib1p: { initEnv: InitEnvFn };
-try {
-  lib1p = await import('@mdr/lib-1password');
-} catch (err) {
-  // Only treat as "lib-1password missing" when the error clearly
-  // identifies @mdr/lib-1password itself as the missing target.
-  // Transitive-dep failures re-throw so the real root cause surfaces
-  // instead of the misleading FATAL below.
-  if (!isOptionalDepMissing(err, '@mdr/lib-1password')) throw err;
-  const caller = process.argv[1] || 'unknown';
-  if (process.env.CI) {
-    // CI: lib-1password not needed, use stub that returns empty result
-    console.log(`[lib-utils] lib-1password not available, using stub (caller: ${caller})`);
-    lib1p = { initEnv: () => ({ parsed: {} }) };
-  } else {
+const require = createRequire(import.meta.url);
+let lib1p: { initEnv: InitEnvFn } | undefined;
+
+function _loadLib1p(): { initEnv: InitEnvFn } {
+  if (lib1p) return lib1p;
+  try {
+    lib1p = require('@mdr/lib-1password') as { initEnv: InitEnvFn };
+    return lib1p;
+  } catch (err) {
+    // Only treat as "lib-1password missing" when the error clearly
+    // identifies @mdr/lib-1password itself as the missing target.
+    // Transitive-dep failures re-throw so the real root cause surfaces
+    // instead of the misleading FATAL below.
+    if (!isOptionalDepMissing(err, '@mdr/lib-1password')) throw err;
+    const caller = process.argv[1] || 'unknown';
+    if (process.env.CI) {
+      // CI: lib-1password not needed, use stub that returns empty result
+      console.log(`[lib-utils] lib-1password not available, using stub (caller: ${caller})`);
+      lib1p = { initEnv: () => ({ parsed: {} }) };
+      return lib1p;
+    }
     // Development: lib-1password is required, fail loudly
     console.error(
       `[lib-utils] FATAL: lib-1password not available.\n` +
@@ -68,5 +71,5 @@ const consoleLog: Log = {
  * @returns { parsed: Record<string, string> } - The loaded/skipped env vars
  */
 export function initEnv(callerDir: string, skipIfEnvVars: string[] = [], log: Log = consoleLog): DotenvConfigOutput {
-  return lib1p.initEnv(callerDir, skipIfEnvVars, log);
+  return _loadLib1p().initEnv(callerDir, skipIfEnvVars, log);
 }
